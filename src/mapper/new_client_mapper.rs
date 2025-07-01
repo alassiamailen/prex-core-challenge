@@ -2,7 +2,7 @@ use crate::dto::new_client_dto::NewClientDto;
 use crate::model::client_model::Client;
 
 /// Map [NewClientDto] to [Client] from [NewClientDto] new_client and [i32] client_id
-fn map_new_client_to_client(new_client: NewClientDto, client_id:i32) -> Client{
+pub fn map_new_client_to_client(new_client: NewClientDto, client_id:i32) -> Client{
     Client{
         client_id,
         client_name: new_client.client_name,

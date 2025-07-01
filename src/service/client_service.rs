@@ -4,6 +4,8 @@ use std::result::Result;
 use crate::dto::new_client_dto::NewClientDto;
 use crate::errors::common_error::CommonError;
 use crate::state::AppState;
+use crate::mapper::new_client_mapper::map_new_client_to_client;
+
 
 /// Client service
 #[async_trait]
@@ -17,10 +19,10 @@ pub struct ClientService{
     app_state: Arc<AppState>,
 }
 
-/// default initialization
-impl Default for ClientService{
-    fn default() -> Self {
-        ClientService
+/// Initialization
+impl ClientService{
+    pub fn new(app_state: Arc<AppState>) -> Self {
+        ClientService{app_state}
     }
 }
 
@@ -30,45 +32,54 @@ impl ClientServiceTrait for ClientService {
     /// Create a [NewClientDto] based on [NewClientDto]
     async fn create_new_client(&self, new_client:NewClientDto)->Result<i32, CommonError>{
         info!("create_new_client - start");
-        let document_number = new_client.document_number;
-        // verify id client exists
-       match self.validate_client_id(document_number).await{
-            true => {
-                // Generate unique id for each client
-                let client_id = self.generate_client_id();
-                // dsp   aqui deberia mappear el dto al modelo y guardarlo en mi estrucutra memoria
+        let document_number = &new_client.document_number;
 
-            }
-           false => {
-               error!("create_new_client - error - the entered document already exists - document number: {document_number}");
-               Err(CommonError::BAD_REQUEST)
-           }
+        // verify client document exists
+       if(!self.validate_client_document(document_number)){
+           error!("create_new_client - error - the entered document already exists - document number: {document_number}");
+           return Err(CommonError::BAD_REQUEST);
        }
 
+        // Generate unique id for each client
+        let client_id = self.generate_client_id();
 
+        // map Client from NewClientDto
+        let populate_new_client= map_new_client_to_client(new_client,client_id);
 
+        // Insert Client and id in app_state
+        match self.app_state.clients.write(){
+            Ok(app_state)=>{
+                app_state.insert(client_id,populate_new_client);
+                info!("create_new_client - done");
+                Ok(client_id)
+            }
+            Err(_)=>{
+                error!("create_new_client - error - has occurred an error while try write in app_state");
+                Err(CommonError::INTERNAL_SERVER_ERROR)
+            }
+        }
     }
 }
 /// Client service "private" implement logic
 impl ClientService {
-/// Validate if id client exists based on [i32] client_id
-async fn validate_client_id(&self,document_number: String) -> bool{
-    info!("validate_client_id - start");
+/// Validate if client document number based on [String] document_number
+fn validate_client_document(&self,document_number: &str) -> bool{
+    info!("validate_client_document - start");
     /// map clients
-    let clients_map= self.app_state.clients.read().await;
+    let clients_map= self.app_state.clients.read();
     /// get a document if exists
     let get_document_number = clients_map.values().any(|client: Client|client.document_number == document_number);
 
        if(get_document_number){
-           warn!("validate_client_id - the document entered already exists");
+           warn!("validate_client_document - the document entered already exists");
            false
        }else{
-           debug!("validate_client_id - document unique - done");
+           debug!("validate_client_document - document unique - done");
            true
        }
 }
     /// Generate a client id unique
     fn generate_client_id(&self) -> i32 {
-        self.app_state.client_id_unique.fetch_add(1, Ordering::SeqCst);
+        self.app_state.client_id_unique.fetch_add(1, Ordering::SeqCst)
     }
 }
