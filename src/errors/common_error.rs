@@ -1,5 +1,5 @@
 #[derive(Debug)]
-pub enum CommonError{
+pub enum CommonError {
     NOT_FOUND,
     INTERNAL_SERVER_ERROR,
     INVALIDATE,

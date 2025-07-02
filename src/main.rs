@@ -1,28 +1,28 @@
 mod constants;
-mod dto;
-mod mapper;
-mod errors;
-mod service;
 mod controller;
-mod state;
+mod dto;
+mod errors;
+mod mapper;
 mod model;
-use std::sync::RwLock;
+mod service;
+mod state;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::RwLock;
 
-use actix_web::{web, App, HttpServer};
-use crate::state::app_state::AppState;
-use std::sync::atomic::AtomicI32;
 use crate::controller::client_controller::ClientController;
 use crate::service::client_service::{ClientService, DynClientService};
+use crate::state::app_state::AppState;
+use actix_web::{web, App, HttpServer};
 use env_logger;
+use std::sync::atomic::AtomicI32;
 
 #[actix_web::main]
-async fn main() -> std::io::Result<()>{
+async fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_LOG", "debug");
     env_logger::init();
     // declarate AppState
-    let app_state= AppState{
+    let app_state = AppState {
         clients: RwLock::new(HashMap::new()),
         client_id_unique: AtomicI32::new(1),
     };
@@ -43,6 +43,4 @@ async fn main() -> std::io::Result<()>{
     .bind("127.0.0.1:8080")?
     .run()
     .await
-    
 }
- 

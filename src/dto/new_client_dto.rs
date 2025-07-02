@@ -4,10 +4,10 @@ use serde::Deserialize;
 /// New Client struct
 #[derive(Deserialize)]
 pub struct NewClientDto {
-    // client name   
+    // client name
     pub client_name: String,
     // client birth date
-    pub birth_date:NaiveDate,
+    pub birth_date: NaiveDate,
     // document number
     pub document_number: String,
     //country

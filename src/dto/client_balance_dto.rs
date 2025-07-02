@@ -1,16 +1,16 @@
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use serde::Deserialize;
- 
+
 /// Client Balance struct
 #[derive(Deserialize)]
 pub struct ClientBalanceDto {
-    // client id   
+    // client id
     pub client_id: i32,
     // client name
     pub client_name: String,
     // client birth date
-    pub birth_date:NaiveDate,
+    pub birth_date: NaiveDate,
     // document number
     pub document_number: String,
     //country
