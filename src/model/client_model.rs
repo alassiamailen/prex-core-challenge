@@ -15,7 +15,7 @@ pub struct Client{
     //country
     pub country: String,
     // money in account
-    pub balance: Option<Decimal>,
+    pub balance: Decimal,
 
 }
 /// Unit test cases
@@ -34,7 +34,7 @@ mod tests {
     /// Get Client model
      #[tokio::test]
     async fn test_client_model(){
-        let balance = Some(Decimal::new(10, 2));
+        let balance = Decimal::new(10, 2);
         let birth_date = NaiveDate::from_ymd_opt(1990, 1, 1).unwrap();
 
         let expected_result = Client{
@@ -52,7 +52,7 @@ mod tests {
         assert_eq!(birth_date,expected_result.birth_date);
         assert_eq!(COUNTRY,expected_result.country);
         assert_eq!(DOCUMENT_NUMBER,expected_result.document_number);
-        assert_eq!(CLIENT_NAME,expected_result.client_name.unwrap);
+        assert_eq!(CLIENT_NAME,expected_result.client_name);
     }
 }
 

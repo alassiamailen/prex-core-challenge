@@ -1,5 +1,6 @@
 use crate::dto::new_client_dto::NewClientDto;
 use crate::model::client_model::Client;
+use rust_decimal::Decimal;
 
 /// Maps an [Client] from [NewClientDto] and [i32] client_id
 pub fn client_map(new_client: NewClientDto, client_id:i32) -> Client{
@@ -9,6 +10,6 @@ pub fn client_map(new_client: NewClientDto, client_id:i32) -> Client{
         birth_date: new_client.birth_date,
         document_number: new_client.document_number,
         country: new_client.country,
-        credit_amount: None,
+        balance: Decimal::new(0,0),
     }
 }

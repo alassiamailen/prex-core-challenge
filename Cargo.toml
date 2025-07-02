@@ -14,3 +14,4 @@ chrono = { version = "0.4", features = ["serde"] }
 rust_decimal = { version = "1", features = ["serde"] }
 actix-web = "4"
 log = "0.4.27"
+env_logger = "0.10"

@@ -1,53 +1,46 @@
-use crate::service::client_service::{DynClientService, ClientService};
-use actix_web::{web, Scope, HttpResponse, Responder, post};
+use crate::service::client_service::{DynClientService};
+use actix_web::{web, Scope, self,HttpResponse, Responder};
 use actix_web::web::route;
 use crate::constants::constants::{MAIN_PATH, NEW_CLIENT_PATH};
+use crate::dto::new_client_dto::NewClientDto;
 
 
-/// Client controller trait
-pub trait ClientControllerTrait{
-    fn config_endpoints(&self) -> Scope;
+/// Client controller
+#[derive(Clone)]
+pub struct ClientController{    
+    client_service: DynClientService
 }
 
-/// Client controller implementation struct
-pub struct ClientController{
-    client_service: DynClientService,
-}
-
-/// Implementation
+/// Implementation Client controller
 impl ClientController{
-    /// Configure declared endpoints for this controller
-   pub fn new(client_service: DynClientService) -> Self{
-        Self{client_service} 
-    }
-
-    async fn map_create_new_client(
-        &self,
-        payload: web::Json<NewClientDto>,
-    ) -> impl Responder{
-        match self.client_service.create_new_client(payload.into_inner()).await{
-            Ok(id) => HttpResponse::Ok().json(id),
-            Err(_)=> HttpResponse::InternalServerError().body("Error creating new client")
-        }
-    }
     
-   fn create_routes(&self) -> Scope{
-       let client_controller = self.clone();       
-       web::scope(NEW_CLIENT_PATH)
-        .route(
-           "",
-           web::post().to(move|payload| client_controller.map_create_new_client(payload)),
-       )
-       
-   }
+   pub fn new(service: DynClientService) -> Self{
+        Self{client_service: service} 
+    }
+    /// Configure declared endpoints for this controller
+    pub fn create_routes(&self) -> Scope{
+        let client_controller= self.clone();
+        web::scope(MAIN_PATH)
+            .route(NEW_CLIENT_PATH,
+                web::post().to(map_create_new_client),
+            )
+    }    
+  
 }
 
-impl ClientControllerTrait for ClientController{
-    fn config_endpoints(&self) -> Scope{
-        web::scope(MAIN_PATH)
-            .service(self.create_routes())
+/// Maps new client end-point
+async fn map_create_new_client(
+    service: web::Data<DynClientService>,
+    new_client: web::Json<NewClientDto>,
+) -> impl Responder{
+    match service.create_new_client(new_client.into_inner()).await{
+        Ok(id) => HttpResponse::Ok().json(id),
+        Err(_)=> HttpResponse::InternalServerError().body("Error creating new client")
     }
 }
+
+
+
 
 
 
