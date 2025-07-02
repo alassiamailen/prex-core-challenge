@@ -1,6 +1,7 @@
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
 
+
 /// Client model
 pub struct Client{
     // client id
@@ -14,7 +15,7 @@ pub struct Client{
     //country
     pub country: String,
     // money in account
-    pub credit_amount: Option<Decimal>,
+    pub balance: Option<Decimal>,
 
 }
 /// Unit test cases
@@ -33,7 +34,7 @@ mod tests {
     /// Get Client model
      #[tokio::test]
     async fn test_client_model(){
-        let credit_amount = Some(Decimal::new(10, 2));
+        let balance = Some(Decimal::new(10, 2));
         let birth_date = NaiveDate::from_ymd_opt(1990, 1, 1).unwrap();
 
         let expected_result = Client{
@@ -42,12 +43,12 @@ mod tests {
             birth_date,
             document_number:DOCUMENT_NUMBER.to_string(),
             country:COUNTRY.to_string(),
-            credit_amount,
+            balance,
     };
 
 
         assert_eq!(CLIENT_ID,expected_result.client_id);
-        assert_eq!(credit_amount,expected_result.credit_amount);
+        assert_eq!(balance,expected_result.balance);
         assert_eq!(birth_date,expected_result.birth_date);
         assert_eq!(COUNTRY,expected_result.country);
         assert_eq!(DOCUMENT_NUMBER,expected_result.document_number);

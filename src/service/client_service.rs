@@ -2,9 +2,10 @@ use async_trait::async_trait;
 use log::info;
 use std::result::Result;
 use crate::dto::new_client_dto::NewClientDto;
+use crate::dto::new_credit_transaction_dto::NewCreditTransactionDto;
 use crate::errors::common_error::CommonError;
 use crate::state::AppState;
-use crate::mapper::new_client_mapper::map_new_client_to_client;
+use crate::mapper::new_client_mapper::client_map;
 
 
 /// Client service
@@ -13,6 +14,10 @@ pub trait ClientServiceTrait {
     /// Create new Client from [NewClientDto] new_client
     /// Returns a [CommonError] if the document number already exists or service throws any error
     async fn create_new_client(&self, new_client:NewClientDto)->Result<i32, CommonError>;
+
+    /// Create a new transaction from [NewCreditTransactionDto] credit_transaction
+    /// Returns a [CommonError] if client_id has not existed or service throws any error
+    async fn create_new_credit_transaction(&self, credit_transaction: NewCreditTransactionDto) -> Result<Decimal, CommonError>;
 }
 /// Client service implementation struct
 pub struct ClientService{
@@ -29,7 +34,8 @@ impl ClientService{
 /// Client service implement logic
 #[async_trait]
 impl ClientServiceTrait for ClientService {
-    /// Create a [NewClientDto] based on [NewClientDto]
+    /// Create new Client from [NewClientDto] new_client
+    /// Returns a [CommonError] if the document number already exists or service throws any error
     async fn create_new_client(&self, new_client:NewClientDto)->Result<i32, CommonError>{
         info!("create_new_client - start");
         let document_number = &new_client.document_number;
@@ -44,7 +50,7 @@ impl ClientServiceTrait for ClientService {
         let client_id = self.generate_client_id();
 
         // map Client from NewClientDto
-        let populate_new_client= map_new_client_to_client(new_client,client_id);
+        let populate_new_client= client_map(new_client,client_id);
 
         // Insert Client and id in app_state
         match self.app_state.clients.write(){
@@ -59,10 +65,37 @@ impl ClientServiceTrait for ClientService {
             }
         }
     }
+    /// Create a new transaction from [NewCreditTransactionDto] credit_transaction
+    /// Returns a [CommonError] if client_id has not existed or service throws any error
+    async fn create_new_credit_transaction(&self, credit_transaction: NewCreditTransactionDto) -> Result<Decimal, CommonError>{
+        info!("create_new_credit_transaction - start");
+        let client_id= credit_transaction.client_id;
+
+        // validate if client id exists
+        match self.validate_client_id(client_id){
+            Ok(client_id)=>{
+               // update client balance
+                match self.new_credit_on_client_account(client_id,credit_transaction.balance){
+                    Ok(balance)=>{
+                        info!("create_new_credit_transaction - done");
+                        Ok(balance)
+                    }
+                    Err(error)=>{
+                        error!("create_new_credit_transaction - error: {}",error);
+                        Err(CommonError::BAD_REQUEST)
+                    }
+                }
+            }
+            Err(error)=>{
+                error!("create_new_credit_transaction - error: {}",error);
+                Err(CommonError::NOT_FOUND)
+            }
+        }
+    }
 }
 /// Client service "private" implement logic
 impl ClientService {
-/// Validate if client document number based on [String] document_number
+/// Validate if the client document number exists based on [String] document_number
 fn validate_client_document(&self,document_number: &str) -> bool{
     info!("validate_client_document - start");
     /// map clients
@@ -82,4 +115,48 @@ fn validate_client_document(&self,document_number: &str) -> bool{
     fn generate_client_id(&self) -> i32 {
         self.app_state.client_id_unique.fetch_add(1, Ordering::SeqCst)
     }
+
+    /// Validate if client id exists based on [Decimal] client_id
+    fn validate_client_id(&self, client_id: i32) -> Result<i32, CommonError>{
+        debug!("validate_client_id - start");
+
+        /// map clients
+        let clients_map= self.app_state.clients.read();
+
+        /// get a client id if exists
+        match clients_map.get(&client_id){
+            Some(client)=>{
+                debug!("validate_client_id - done");
+                Ok(client.client_id)
+            }
+            None=>{
+                error!("validate_client_id - error - client id not found client id: {}",client_id);
+                Err(CommonError::NOT_FOUND)
+            }
+        }
+    }
+
+    // Create new credit on client account from [Decimal] credit_amount based on [i32] client_id
+    fn new_credit_on_client_account(&self, client_id: i32, credit_amount: Decimal) -> Result<Decimal, CommonError>{
+        debug!("new_credit_on_client_account - start");
+
+        /// map clients
+        let clients_map= self.app_state.clients.write();
+        // get client and update balance
+        match clients_map.get_mut(&client_id){
+            Some(client)=>{
+                debug!("new_credit_on_client_account - done");
+                client.balance += credit_amount;
+                Ok(client.balance)
+            }
+            None=>{
+                error!("new_credit_on_client_account - error - has occurred an error while try write in app_state");
+                Err(CommonError::BAD_REQUEST)
+            }
+        }
+    }
+
 }
+
+/// Client service trait dyn type
+pub type DynClientService = Arc<dyn ClientServiceTrait + Send  + Sync>;
