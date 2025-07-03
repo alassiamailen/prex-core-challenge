@@ -16,6 +16,7 @@ use crate::state::app_state::AppState;
 use actix_web::{web, App, HttpServer};
 use env_logger;
 use std::sync::atomic::AtomicI32;
+use log::info;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -26,7 +27,8 @@ async fn main() -> std::io::Result<()> {
         clients: RwLock::new(HashMap::new()),
         client_id_unique: AtomicI32::new(1),
     };
-    println!("Server running http://localhost:8080...");
+    info!("Actix server - starting...");
+    info!("Actix server - listening on: 0.0.0.0:8080...");
     let share_state = Arc::new(app_state);
 
     // create service

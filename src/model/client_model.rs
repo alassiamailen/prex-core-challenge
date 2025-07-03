@@ -2,7 +2,7 @@ use chrono::NaiveDate;
 use rust_decimal::Decimal;
 
 /// Client model
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Client {
     // client id
     pub client_id: i32,

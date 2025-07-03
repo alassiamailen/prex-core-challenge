@@ -1,8 +1,10 @@
 use crate::dto::new_client_dto::NewClientDto;
 use crate::dto::new_credit_transaction::NewCreditTransactionDto;
 use crate::dto::new_debit_transaction::NewDebitTransactionDto;
+use crate::dto::client_info_dto::ClientInfoDto;
 use crate::errors::common_error::CommonError;
 use crate::mapper::new_client_mapper::client_map;
+use crate::mapper::client_info_mapper::client_info_map;
 use crate::state::app_state::AppState;
 use async_trait::async_trait;
 use tokio::fs::{self, File};
@@ -15,9 +17,12 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use rust_decimal::prelude::Zero;
 use crate::constants::constants::{CLIENT_BALANCE_FOLDER, PREFIX_FILE};
+use crate::model::client_model::Client;
+use mockall::automock;
 
 /// Client service
 #[async_trait]
+#[automock]
 pub trait ClientServiceTrait {
     /// Create new Client from [NewClientDto] new_client
     /// Returns a [CommonError] if the document number already exists or service throws any error
@@ -35,9 +40,12 @@ pub trait ClientServiceTrait {
         &self,
         debit_transaction: NewDebitTransactionDto,
     ) -> Result<Decimal, CommonError>;
-    /// Generate file.txt with all client's balances
+    /// Generate file.DAT with all client's balances
     /// Returns a [CommonError] if the file cannot be generator or service throws any error
     async fn generate_file_with_all_clients_balances(&self) -> Result<(), CommonError>;
+    /// Get [ClientInfoDto] from [i32] client_id
+    /// Returns a [CommonError] if client_id has not existed or service throws any error
+    async fn get_client_balance(&self, client_id:i32) ->Result<ClientInfoDto, CommonError>;
 }
 
 /// Client service implementation struct
@@ -101,9 +109,9 @@ impl ClientServiceTrait for ClientService {
 
         // validate if client id exists
         match self.validate_client_id(client_id) {
-            Ok(client_id) => {
+            Ok(client) => {
                 // update client balance
-                match self.new_credit_on_client_account(client_id, transaction.credit_amount) {
+                match self.new_credit_on_client_account(client.client_id, transaction.credit_amount) {
                     Ok(balance) => {
                         info!("create_new_credit_transaction - done");
                         Ok(balance)
@@ -132,9 +140,9 @@ impl ClientServiceTrait for ClientService {
 
         // validate if client id exists
         match self.validate_client_id(client_id) {
-            Ok(client_id) => {
+            Ok(client) => {
                 // update client balance
-                match self.new_debit_on_client_account(client_id, transaction.debit_amount) {
+                match self.new_debit_on_client_account(client.client_id, transaction.debit_amount) {
                     Ok(balance) => {
                         info!("create_new_debit_transaction - done");
                         Ok(balance)
@@ -175,6 +183,24 @@ impl ClientServiceTrait for ClientService {
             }
             Err(error) =>{
                 error!("generate_file_with_all_clients_balances - error: {:?}", error);
+                Err(error)
+            }
+        }
+    }
+
+    /// Get [ClientInfoDto] from [i32] client_id
+    /// Returns a [CommonError] if client_id has not existed or service throws any error
+    async fn get_client_balance(&self, client_id: i32) ->Result<ClientInfoDto, CommonError>{
+        info!("get_client_balance - start");
+
+        match self.validate_client_id(client_id){
+            Ok(client) =>{
+                let client_info_dto= client_info_map(client, client_id);
+                debug!("get_client_balance - done");
+                Ok(client_info_dto)
+            }
+            Err(error)=>{
+                error!("get_client_balance - error: {:?}", error);
                 Err(error)
             }
         }
@@ -220,7 +246,7 @@ impl ClientService {
 
     /// Validate if client id exists based on [Decimal] client_id
     /// Returns a [CommonError] if the RwLock cannot be read or cannot find the Client
-    fn validate_client_id(&self, client_id: i32) -> Result<i32, CommonError> {
+    fn validate_client_id(&self, client_id: i32) -> Result<Client, CommonError> {
         debug!("validate_client_id - start");
 
         match self.app_state.clients.read() {
@@ -229,7 +255,7 @@ impl ClientService {
                 match clients_map.get(&client_id) {
                     Some(client) => {
                         debug!("validate_client_id - done");
-                        Ok(client.client_id)
+                        Ok(client.clone())
                     }
                     None => {
                         error!(
@@ -336,7 +362,7 @@ impl ClientService {
         })?{
             let get_file_name= file.file_name();
             let file_name= get_file_name.to_string_lossy();
-            if(file_name.starts_with(&prefix_file_name) && file_name.ends_with(PREFIX_FILE)){
+            if file_name.starts_with(&prefix_file_name) && file_name.ends_with(PREFIX_FILE){
                 file_counter+=1;
             }
         }
@@ -362,7 +388,7 @@ impl ClientService {
         }
         // sort client id in ascending order
         temporal_client_data.sort_by_key(|(client_id,_)|*client_id);
-        // create new file
+
         let mut new_file = fs::File::create(&format_file_name).await.map_err(|error| {
             error!("write_in_the_file_the_balance_of_the_clients - error when creating file error: {:?}",error);
             CommonError::FILE_CREATION_FAILED
@@ -391,3 +417,20 @@ impl ClientService {
 
 /// Client service trait dyn type
 pub type DynClientService = Arc<dyn ClientServiceTrait + Send + Sync>;
+
+/// Unit test cases
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::service::client_service::ClientServiceTrait;
+    /// Scenario:
+    /// Execute create_new_client when [NewClientDto] is valid
+    /// Expectation:
+    /// A client id should be returned
+    #[tokio::test]
+    async fn when_create_new_client_with_valid_values_should_return_client_id(){
+        let mut mock_client_service= MockClientServiceTrait::new();
+        
+    }
+
+}

@@ -1,4 +1,4 @@
-use crate::constants::constants::{MAIN_PATH, CLIENT_BALANCE_FOLDER, NEW_CLIENT_PATH, NEW_CREDIT_TRANSACTION_PATH, NEW_DEBIT_TRANSACTION_PATH, STORE_BALANCE_PATH};
+use crate::constants::constants::{MAIN_PATH, CLIENT_BALANCE_PATH, NEW_CLIENT_PATH, NEW_CREDIT_TRANSACTION_PATH, NEW_DEBIT_TRANSACTION_PATH, STORE_BALANCE_PATH};
 use crate::dto::new_client_dto::NewClientDto;
 use crate::dto::new_credit_transaction::NewCreditTransactionDto;
 use crate::dto::new_debit_transaction::NewDebitTransactionDto;
@@ -28,6 +28,7 @@ impl ClientController {
             .route(NEW_CREDIT_TRANSACTION_PATH, web::post().to(map_create_new_credit_transaction))
             .route(NEW_DEBIT_TRANSACTION_PATH, web::post().to(map_create_new_debit_transaction))
             .route(STORE_BALANCE_PATH, web::post().to(map_create_balance_files))
+            .route(CLIENT_BALANCE_PATH, web::get().to(map_get_client_balance))
     }
 }
 
@@ -88,6 +89,20 @@ async fn map_create_balance_files(
                 _ => "An unexpected error occurred",
             };
             HttpResponse::InternalServerError().body(message)
+        },
+    }
+}
+/// Maps get client balance end-point
+async fn map_get_client_balance(
+    service: web::Data<DynClientService>,
+    client_id: web::Path<i32>,
+) -> impl Responder {
+    match service.get_client_balance(client_id.into_inner()).await {
+        Ok(client_info) => HttpResponse::Ok().json(client_info),
+        Err(error) => match error {
+            CommonError::NOT_FOUND => HttpResponse::NotFound().body("Client not found"),
+            CommonError::LOCK_READ_FAILED => HttpResponse::NotFound().body("Error when reading app_state"),
+            _ => HttpResponse::InternalServerError().body("An unexpected error occurred"),
         },
     }
 }
