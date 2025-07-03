@@ -3,14 +3,18 @@ use crate::dto::new_credit_transaction::NewCreditTransactionDto;
 use crate::dto::new_debit_transaction::NewDebitTransactionDto;
 use crate::errors::common_error::CommonError;
 use crate::mapper::new_client_mapper::client_map;
-use crate::model::client_model::Client;
 use crate::state::app_state::AppState;
 use async_trait::async_trait;
-use log::warn;
+use tokio::fs::{self, File};
+use tokio::io::AsyncWriteExt;
+use chrono::Local;
+use std::path::Path;
 use log::{debug, error, info};
 use rust_decimal::Decimal;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use rust_decimal::prelude::Zero;
+use crate::constants::constants::{CLIENT_BALANCE_FOLDER, PREFIX_FILE};
 
 /// Client service
 #[async_trait]
@@ -31,6 +35,9 @@ pub trait ClientServiceTrait {
         &self,
         debit_transaction: NewDebitTransactionDto,
     ) -> Result<Decimal, CommonError>;
+    /// Generate file.txt with all client's balances
+    /// Returns a [CommonError] if the file cannot be generator or service throws any error
+    async fn generate_file_with_all_clients_balances(&self) -> Result<(), CommonError>;
 }
 
 /// Client service implementation struct
@@ -144,10 +151,39 @@ impl ClientServiceTrait for ClientService {
             }
         }
     }
+    /// Generate file.txt with all client's balances
+    /// Returns a [CommonError] if the file cannot be generator or service throws any error
+    async fn generate_file_with_all_clients_balances(&self) -> Result<(), CommonError>{
+        info!("generate_file_with_all_clients_balances - start");
+
+        let date= Local::now();
+        let date_to_string= date.format("%d%m%Y").to_string();
+        match self.generate_next_balance_file_name(date_to_string).await{
+            
+            Ok(file_name)=>{
+                
+                match self.write_in_the_file_the_balance_of_the_clients(file_name).await{
+                    Ok(())=>{
+                        debug!("generate_file_with_all_clients_balances - done");
+                        Ok(())
+                    }
+                    Err(error)=>{
+                        error!("generate_file_with_all_clients_balances - error: {:?}", error);
+                        Err(error)
+                    }
+                }                
+            }
+            Err(error) =>{
+                error!("generate_file_with_all_clients_balances - error: {:?}", error);
+                Err(error)
+            }
+        }
+    }
 }
 /// Client service "private" implement logic
 impl ClientService {
     /// Validate if the client document number exists based on [String] document_number
+    /// Returns a [CommonError] if RwLock cannot be read or the document number already exists
     fn validate_client_document(&self, document_number: &str) -> Result<bool, CommonError> {
         debug!("validate_client_document - start");
 
@@ -165,13 +201,13 @@ impl ClientService {
                     error!("validate_client_id - error - the document must be unique"
                     );
                     Err(CommonError::FORBIDEN)
-                } 
+                }
             }
             Err(_) => {
                 error!(
                     "validate_client_id - error -has occurred an error while try read in app_state"
                 );
-                Err(CommonError::INTERNAL_SERVER_ERROR)
+                Err(CommonError::LOCK_READ_FAILED)
             }
         }
     }
@@ -183,6 +219,7 @@ impl ClientService {
     }
 
     /// Validate if client id exists based on [Decimal] client_id
+    /// Returns a [CommonError] if the RwLock cannot be read or cannot find the Client
     fn validate_client_id(&self, client_id: i32) -> Result<i32, CommonError> {
         debug!("validate_client_id - start");
 
@@ -207,19 +244,20 @@ impl ClientService {
                 error!(
                     "validate_client_id - error -has occurred an error while try read in app_state"
                 );
-                Err(CommonError::INTERNAL_SERVER_ERROR)
+                Err(CommonError::LOCK_READ_FAILED)
             }
         }
     }
 
-    // Create a new credit on a client account from [Decimal] credit_amount based on [i32] client_id
+    /// Create a new credit on a client account from [Decimal] credit_amount based on [i32] client_id
+    /// Returns a [CommonError] if the RwLock cannot be written or cannot find the Client
     fn new_credit_on_client_account(
         &self,
         client_id: i32,
         credit_amount: Decimal,
     ) -> Result<Decimal, CommonError> {
         debug!("new_credit_on_client_account - start");
-        
+
         match self.app_state.clients.write() {
             Ok(mut clients_map) => {
                 match clients_map.get_mut(&client_id) {
@@ -237,12 +275,13 @@ impl ClientService {
             }
             Err(_) => {
                 error!("new_credit_on_client_account - error -has occurred an error while try write in app_state");
-                Err(CommonError::INTERNAL_SERVER_ERROR)
+                Err(CommonError::LOCK_WRITE_FAILED)
             }
         }
     }
 
-    // Create new debit on a client account from [Decimal] debit_amount based on [i32] client_id
+    /// Create new debit on a client account from [Decimal] debit_amount based on [i32] client_id
+    /// Returns a [CommonError] if the RwLock cannot be written or cannot find the Client
     fn new_debit_on_client_account(
         &self,
         client_id: i32,
@@ -268,9 +307,85 @@ impl ClientService {
             }
             Err(_) => {
                 error!("new_debit_on_client_account - error -has occurred an error while try write in app_state");
-                Err(CommonError::INTERNAL_SERVER_ERROR)
+                Err(CommonError::LOCK_WRITE_FAILED)
             }
         }
+    }
+    /// Generates the full path for the next client balance file in the format `DDMMYYYY_N.DAT`, based on how many files already exist in the storage folder
+    /// Returns a [CommonError] if throws any error
+    async fn generate_next_balance_file_name(&self,date:String) -> Result<String,CommonError>{
+        debug!("generate_next_balance_file_name - start");
+
+        let prefix_file_name= format!("{}_{}",date,"");
+        // create folder
+        if !Path::new(CLIENT_BALANCE_FOLDER).exists(){
+           fs::create_dir(CLIENT_BALANCE_FOLDER).await.map_err(|error| {
+               error!("generate_next_balance_file_name - error when creating folder error: {:?}",error);
+               CommonError::FOLDER_CREATION_FAILED })?;
+        }
+
+        let mut file_counter= 1;
+        // read folder
+        let mut read_folder= fs::read_dir(CLIENT_BALANCE_FOLDER).await.map_err(|error| {
+            error!("generate_next_balance_file_name - error when reading folder error: {:?}",error);
+            CommonError::FOLDER_READ_FAILED
+        })?;
+        while let Some(file) = read_folder.next_entry().await.map_err(|error| {
+            error!("generate_next_balance_file_name - error when reading file error: {:?}",error);
+            CommonError::FOLDER_READ_FAILED
+        })?{
+            let get_file_name= file.file_name();
+            let file_name= get_file_name.to_string_lossy();
+            if(file_name.starts_with(&prefix_file_name) && file_name.ends_with(PREFIX_FILE)){
+                file_counter+=1;
+            }
+        }
+        let format_file_name= format!("{}/{}_{}{}",CLIENT_BALANCE_FOLDER,date,file_counter,PREFIX_FILE);
+        
+        Ok(format_file_name)
+
+    }
+    /// Create a text file and save client balances
+    /// Returns a [CommonError] if throws any error
+    async fn write_in_the_file_the_balance_of_the_clients(&self, format_file_name: String)->Result<(),CommonError> {
+        debug!("write_in_the_file_the_balance_of_the_clients - start");
+
+        let mut temporal_client_data: Vec<(i32, Decimal)> = Vec::new();
+        {
+            let clients_map = self.app_state.clients.read().map_err(|error| {
+                error!("write_in_the_file_the_balance_of_the_clients - error when reading app_state - error: {:?}",error);
+                CommonError::LOCK_READ_FAILED
+            })?;
+            for client in clients_map.values() {
+                temporal_client_data.push((client.client_id, client.balance));
+            }
+        }
+        // sort client id in ascending order
+        temporal_client_data.sort_by_key(|(client_id,_)|*client_id);
+        // create new file
+        let mut new_file = fs::File::create(&format_file_name).await.map_err(|error| {
+            error!("write_in_the_file_the_balance_of_the_clients - error when creating file error: {:?}",error);
+            CommonError::FILE_CREATION_FAILED
+        })?;
+
+        for (client_id, balance) in temporal_client_data {
+            // format client id and balance
+            let each_client = format!("{:02} {:.2}\n", client_id, balance);
+            new_file.write_all(each_client.as_bytes()).await.map_err(|error| {
+                error!("write_in_the_file_the_balance_of_the_clients - error when writing to the file - file name: {format_file_name} - error: {:?}",error);              
+                CommonError::FILE_WRITE_FAILED
+            })?;
+        }
+        // update balances in app_state
+        let mut clients_map = self.app_state.clients.write().map_err(|error| {
+            error!("write_in_the_file_the_balance_of_the_clients - error when writing app_state - error: {:?}",error);
+            CommonError::LOCK_WRITE_FAILED
+        })?;
+        for client in clients_map.values_mut() {
+           client.balance= Decimal::zero();
+        }
+        debug!("write_in_the_file_the_balance_of_the_clients - done");
+        Ok(())
     }
 }
 
