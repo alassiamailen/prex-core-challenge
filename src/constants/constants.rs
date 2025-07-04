@@ -26,8 +26,8 @@ mod tests {
     
     /// Scenario:
     /// Creates constant with valid values
-    #[tokio::test]
-    async fn test_constants() {
+    #[test]
+    fn test_constants() {
         assert_eq!("/api/v1/client", MAIN_PATH);
         assert_eq!("/new_client", NEW_CLIENT_PATH);
         assert_eq!("/new_debit_transaction", NEW_DEBIT_TRANSACTION_PATH);

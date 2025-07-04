@@ -1212,6 +1212,7 @@ dependencies = [
  "env_logger",
  "log",
  "mockall",
+ "once_cell",
  "rust_decimal",
  "serde",
  "serde_json",

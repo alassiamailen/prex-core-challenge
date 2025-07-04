@@ -5,6 +5,7 @@ mod errors;
 mod mapper;
 mod model;
 mod service;
+mod stub;
 mod state;
 use std::collections::HashMap;
 use std::sync::Arc;

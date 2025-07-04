@@ -1,9 +1,9 @@
-use crate::dto::new_client_dto::NewClientDto;
+use crate::dto::new_client_dto::NewClient;
 use crate::model::client_model::Client;
 use rust_decimal::Decimal;
 
-/// Maps an [Client] from [NewClientDto] and [i32] client_id
-pub fn client_map(new_client: NewClientDto, client_id: i32) -> Client {
+/// Maps an [Client] from [NewClient] and [i32] client_id
+pub fn client_map(new_client: NewClient, client_id: i32) -> Client {
     Client {
         client_id,
         client_name: new_client.client_name,

@@ -1,12 +1,12 @@
 #[derive(Debug)]
 pub enum CommonError {
-    NOT_FOUND,
-    INTERNAL_SERVER_ERROR,
-    FOLDER_CREATION_FAILED,
-    FOLDER_READ_FAILED,
-    LOCK_READ_FAILED,
-    LOCK_WRITE_FAILED,
-    FILE_CREATION_FAILED,
-    FILE_WRITE_FAILED,  
-    FORBIDEN,
+    NotFound,
+    InternalServerError,
+    FolderCreationFailed,
+    FolderReadFailed,
+    LockReadFailed,
+    LockWriteFailed,
+    FileCreationFailed,
+    FileWriteFailed,  
+    Forbiden,
 }
