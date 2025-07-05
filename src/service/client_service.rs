@@ -111,6 +111,7 @@ impl ClientServiceTrait for ClientService {
         // validate if client id exists
         match self.validate_client_id(client_id) {
             Ok(client) => {
+                println!("YA LEI AL CLIENTE");
                 // update client balance
                 match self.new_credit_on_client_account(client.client_id, transaction.credit_amount) {
                     Ok(balance) => {
@@ -256,6 +257,7 @@ impl ClientService {
                 match clients_map.get(&client_id) {
                     Some(client) => {
                         debug!("validate_client_id - done");
+                        println!("validate_client_id YA LEI AL CLIENTE");
                         Ok(client.clone())
                     }
                     None => {
@@ -287,6 +289,7 @@ impl ClientService {
 
         match self.app_state.clients.write() {
             Ok(mut clients_map) => {
+                println!("new_credit_on_client_account YA entre AL WRITE");
                 match clients_map.get_mut(&client_id) {
                     Some(client) => {
                         client.balance += credit_amount;
@@ -423,44 +426,45 @@ pub type DynClientService = Arc<dyn ClientServiceTrait + Send + Sync>;
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::fs::File;
     use std::future;
-    use std::thread;
+    use serial_test::serial;
     use std::sync::atomic::AtomicI32;
     use std::sync::RwLock;
-    use rust_decimal::prelude::FromPrimitive;
-    use tokio::join;
     use crate::model::client_model::Client;
     use super::*;
     use crate::stub::new_client_stub::stub::create_new_client_stub;
     use crate::service::client_service::{MockClientServiceTrait,ClientService};
+    use crate::stub::client_info_stub::stub::create_client_info_stub;
     use crate::stub::new_credit_transaction_stub::stub::create_new_credit_transaction_stub;
+    use crate::stub::new_debit_transaction_stub::stub::create_new_debit_transaction_stub;
 
-    const CLIENT_ID: i32 = 1;
+    const MOCK_CLIENT_ID: i32 = 1;
     
-
     /// Scenario:
     /// Execute create_new_client when [NewClient] is valid
     /// Expectation:
     /// A client id should be returned
     #[tokio::test]
+    #[serial]
    async fn when_create_new_client_with_valid_values_should_return_client_id(){
         let new_client= create_new_client_stub();
-        
+
         let mut client_service_mock= MockClientServiceTrait::new();
-        
+
         let app_state = Arc::new(AppState{
             clients: RwLock::new(HashMap::new()),
-            client_id_unique: AtomicI32::new(CLIENT_ID),
+            client_id_unique: AtomicI32::new(MOCK_CLIENT_ID),
         });
         let client_service = ClientService::new(app_state);
 
         client_service_mock
             .expect_create_new_client()
-            .return_once(move |_|Box::pin(future::ready(Ok(CLIENT_ID))));
-        
+            .return_once(move |_|Box::pin(future::ready(Ok(MOCK_CLIENT_ID))));
+
         let expected_result= client_service.create_new_client(new_client).await.unwrap();
-        
-        assert_eq!(CLIENT_ID,expected_result);
+
+        assert_eq!(MOCK_CLIENT_ID,expected_result);
     }
 
     /// Scenario:
@@ -468,21 +472,22 @@ mod tests {
     /// Expectation:
     /// A [CommonError] should be returned
     #[tokio::test]
+    #[serial]
     async fn when_create_new_client_with_valid_values_and_rwlock_failed_should_return_common_error(){
         let new_client= create_new_client_stub();
 
         let client = RwLock::new(HashMap::<i32, Client>::new());
-        
+
         let mut client_service_mock= MockClientServiceTrait::new();
 
         let _ = std::panic::catch_unwind(|| {
             let _write_lock = client.write().unwrap();
             panic!("error trying write");
-        });       
+        });
 
         let app_state = Arc::new(AppState{
             clients: client,
-            client_id_unique: AtomicI32::new(CLIENT_ID),
+            client_id_unique: AtomicI32::new(MOCK_CLIENT_ID),
         });
 
         let client_service = ClientService::new(app_state);
@@ -543,50 +548,14 @@ mod tests {
     /// Expectation:
     /// A client id should be returned
     #[tokio::test]
+    #[serial]
     async fn when_create_new_credit_transaction_with_valid_values_should_return_client_id(){
         let new_credit= create_new_credit_transaction_stub();
         let client_stub= create_new_client_stub();
         let balance = Decimal::new(100,2);
-        
+
         let client = Client{
             client_id:new_credit.client_id,
-            client_name: client_stub.client_name,
-            birth_date: client_stub.birth_date,
-            document_number: client_stub.document_number,
-            country: client_stub.country,
-            balance: Decimal::zero(),
-        }; 
-        
-        let mut client_service_mock= MockClientServiceTrait::new();
-        let mut hashmap = HashMap::new();
-        hashmap.insert(new_credit.client_id, client);
-        let app_state = Arc::new(AppState{
-            clients: RwLock::new(hashmap),
-            client_id_unique: AtomicI32::new(new_credit.client_id),
-        });
-        
-        let client_service = ClientService::new(app_state);
-
-        client_service_mock
-            .expect_create_new_credit_transaction()
-            .return_once(move |_|Box::pin(future::ready(Ok(balance))));
-
-        let expected_result= client_service.create_new_credit_transaction(new_credit).await.unwrap();
-
-        assert_eq!(balance, expected_result);
-    }
-    /// Scenario:
-    /// Execute create_new_credit_transaction when [NewCreditTransaction] is invalid client id
-    /// Expectation:
-    /// A [CommonError] should be returned
-    #[tokio::test]
-    async fn when_create_new_credit_transaction_with_invalid_values_should_return_client_id(){
-        let mut new_credit= create_new_credit_transaction_stub();
-        let client_stub= create_new_client_stub();
-        let balance = Decimal::new(100,2);
-
-        let client = Client{
-            client_id: new_credit.client_id,
             client_name: client_stub.client_name,
             birth_date: client_stub.birth_date,
             document_number: client_stub.document_number,
@@ -597,22 +566,334 @@ mod tests {
         let mut client_service_mock= MockClientServiceTrait::new();
         let mut hashmap = HashMap::new();
         hashmap.insert(new_credit.client_id, client);
+
         let app_state = Arc::new(AppState{
             clients: RwLock::new(hashmap),
             client_id_unique: AtomicI32::new(new_credit.client_id),
         });
-        
+
         let client_service = ClientService::new(app_state);
 
         client_service_mock
             .expect_create_new_credit_transaction()
-            .return_once(move |_|Box::pin(future::ready(Err(CommonError::NotFound))));
-        
-        new_credit.client_id= 0;
-        
+            .return_once(move |_|Box::pin(future::ready(Ok(balance))));
+
+        let expected_result= client_service.create_new_credit_transaction(new_credit).await.unwrap();
+
+        assert_eq!(balance, expected_result);
+    }
+
+    /// Scenario:
+    /// Execute create_new_credit_transaction when [NewCreditTransaction] is invalid client id
+    /// Expectation:
+    /// A [CommonError] should be returned
+    #[tokio::test]
+    #[serial]
+    async fn when_create_new_credit_transaction_with_invalid_values_should_return_client_id(){
+        let new_credit= create_new_credit_transaction_stub();
+        let client_stub= create_new_client_stub();
+
+        let client = Client{
+            client_id:new_credit.client_id,
+            client_name: client_stub.client_name,
+            birth_date: client_stub.birth_date,
+            document_number: client_stub.document_number,
+            country: client_stub.country,
+            balance: Decimal::zero(),
+        };
+
+
+        let mut hashmap = HashMap::new();
+        hashmap.insert(new_credit.client_id, client);
+
+        let app_state = Arc::new(AppState{
+            clients: RwLock::new(hashmap),
+            client_id_unique: AtomicI32::new(new_credit.client_id),
+        });
+
+
+        {   let read_lock = app_state.clients.read().unwrap();
+            assert!(read_lock.contains_key(&new_credit.client_id));
+        }
+        {
+            let mut write_lock = app_state.clients.write().unwrap();
+            write_lock.remove(&new_credit.client_id);
+            write_lock.get(&new_credit.client_id);
+            assert!(write_lock.get(&new_credit.client_id).is_none());
+        }
+
+        let client_service = ClientService::new(app_state);
+
         let expected_result= client_service.create_new_credit_transaction(new_credit).await;
 
         assert_eq!(CommonError::NotFound, expected_result.unwrap_err());
+
     }
+
+    /// Scenario:
+    /// Execute create_new_debit_transaction when [NewDebitTransaction] is valid
+    /// Expectation:
+    /// A client id should be returned
+    #[tokio::test]
+    #[serial]
+    async fn when_create_new_debit_transaction_with_valid_values_should_return_client_id(){
+        let new_debit= create_new_debit_transaction_stub();
+        let client_stub= create_new_client_stub();
+        let balance = Decimal::new(100,2);
+        let updated_balance = Decimal::new(0, 2);
+
+        let client = Client{
+            client_id:new_debit.client_id,
+            client_name: client_stub.client_name,
+            birth_date: client_stub.birth_date,
+            document_number: client_stub.document_number,
+            country: client_stub.country,
+            balance,
+        };
+        let mut hashmap = HashMap::new();
+        hashmap.insert(new_debit.client_id, client);
+
+        let app_state = Arc::new(AppState{
+            clients: RwLock::new(hashmap),
+            client_id_unique: AtomicI32::new(new_debit.client_id),
+        });
+
+        let client_service = ClientService::new(app_state);
+
+        let expected_result= client_service.create_new_debit_transaction(new_debit).await.unwrap();
+
+        assert_eq!(updated_balance, expected_result);
+    }
+
+    /// Scenario:
+    /// Execute create_new_debit_transaction when [NewDebitTransaction] is valid but write RwLock failed
+    /// Expectation:
+    /// A [CommonError] should be returned
+    #[tokio::test]
+    #[serial]
+    async fn when_create_new_debit_transaction_with_valid_values_and_rwlock_failed_should_return_common_error(){
+        let new_debit= create_new_debit_transaction_stub();
+
+        let client = RwLock::new(HashMap::<i32, Client>::new());
+
+        let _ = std::panic::catch_unwind(|| {
+            let _readlock = client.read().unwrap();
+            panic!("error trying read");
+        });
+
+        let app_state = Arc::new(AppState{
+            clients: client,
+            client_id_unique: AtomicI32::new(MOCK_CLIENT_ID),
+        });
+
+        let client_service = ClientService::new(app_state);
+
+        let expected_result= client_service.create_new_debit_transaction(new_debit).await;
+
+        assert_eq!(CommonError::NotFound, expected_result.unwrap_err());
+
+    }
+
+    /// Scenario:
+    /// Execute get_client_balance when [client_id] is valid
+    /// Expectation:
+    /// A [ClientInfo] should be returned
+    #[tokio::test]
+    #[serial]
+    async fn when_get_client_balance_with_valid_values_and_rwlock_failed_should_return_common_error(){
+        let client= create_client_info_stub();
+        let result_client_info= create_client_info_stub();
+        let client_id= client.client_id;
+
+        let client = Client{
+            client_id:client.client_id,
+            client_name: client.client_name,
+            birth_date: client.birth_date,
+            document_number: client.document_number,
+            country: client.country,
+            balance:client.balance,
+        };
+        let mut hashmap = HashMap::new();
+        hashmap.insert(client.client_id, client);
+
+        let app_state = Arc::new(AppState{
+            clients: RwLock::new(hashmap),
+            client_id_unique: AtomicI32::new(client_id),
+        });
+
+        let client_service = ClientService::new(app_state);
+
+        let expected_result= client_service.get_client_balance(client_id).await.unwrap();
+
+        assert_eq!(result_client_info, expected_result);
+
+    }
+
+    /// Scenario:
+    /// Execute get_client_balance when [client_id] is invalid by client id
+    /// Expectation:
+    /// A [CommonError] should be returned
+    #[tokio::test]
+    #[serial]
+    async fn when_get_client_balance_with_invalid_client_id_and_rwlock_failed_should_return_common_error(){
+        let client= create_client_info_stub();
+        let client_id= client.client_id;
+
+        let client = Client{
+            client_id:client.client_id,
+            client_name: client.client_name,
+            birth_date: client.birth_date,
+            document_number: client.document_number,
+            country: client.country,
+            balance:client.balance,
+        };
+        let mut hashmap = HashMap::new();
+        hashmap.insert(client.client_id, client);
+
+        let app_state = Arc::new(AppState{
+            clients: RwLock::new(hashmap),
+            client_id_unique: AtomicI32::new(client_id),
+        });
+
+
+        let client_service = ClientService::new(app_state);
+
+        let expected_result= client_service.get_client_balance(3).await;
+
+        assert_eq!(CommonError::NotFound, expected_result.unwrap_err());
+
+    }
+    /// Scenario:
+    /// Execute generate_file_with_all_clients_balances with exit
+    /// Expectation:
+    /// A [Ok()] should be returned
+    #[tokio::test]
+    #[serial]
+    async fn when_generate_file_with_all_clients_balances_with_exit_should_return_ok(){
+        let client= create_client_info_stub();
+        let client_id= client.client_id;
+
+        let client = Client{
+            client_id:client.client_id,
+            client_name: client.client_name,
+            birth_date: client.birth_date,
+            document_number: client.document_number,
+            country: client.country,
+            balance:client.balance,
+        };
+        let mut hashmap = HashMap::new();
+        hashmap.insert(client.client_id, client);
+
+        let app_state = Arc::new(AppState{
+            clients: RwLock::new(hashmap),
+            client_id_unique: AtomicI32::new(client_id),
+        });
+
+        let _ = tokio::fs::remove_dir_all(CLIENT_BALANCE_FOLDER).await;
+
+        let client_service = ClientService::new(app_state.clone());
+
+        let expected_result= client_service.generate_file_with_all_clients_balances().await;
+        assert!(expected_result.is_ok());
+
+        let folder = std::fs::read_dir(CLIENT_BALANCE_FOLDER)
+            .unwrap()
+            .filter_map(|file| file.ok())
+            .collect::<Vec<_>>();
+        assert!(!folder.is_empty());
+
+        let read_lock= app_state.clients.read().unwrap();
+        let client= read_lock.get(&client_id).unwrap();
+        assert_eq!(client.balance,  Decimal::zero());
+
+    }
+    /// Scenario:
+    /// Execute generate_file_with_all_clients_balances and create folder failed
+    /// Expectation:
+    /// A [CommonError] should be returned
+    #[tokio::test]
+    #[serial]
+    async fn when_generate_file_with_all_clients_balances_and_create_folder_failed_should_return_common_error(){
+        let client= create_client_info_stub();
+        let client_id= client.client_id;
+
+        let _ = std::fs::remove_file(CLIENT_BALANCE_FOLDER);
+        let _ = std::fs::remove_dir_all(CLIENT_BALANCE_FOLDER);
+
+        File::create(CLIENT_BALANCE_FOLDER).expect("Cannot create file");
+
+        let client = Client{
+            client_id:client.client_id,
+            client_name: client.client_name,
+            birth_date: client.birth_date,
+            document_number: client.document_number,
+            country: client.country,
+            balance:client.balance,
+        };
+        let mut hashmap = HashMap::new();
+        hashmap.insert(client.client_id, client);
+
+        let app_state = Arc::new(AppState{
+            clients: RwLock::new(hashmap),
+            client_id_unique: AtomicI32::new(client_id),
+        });
+
+        let client_service = ClientService::new(app_state.clone());
+
+        let expected_result= client_service.generate_file_with_all_clients_balances().await;
+
+        assert_eq!(CommonError::FolderReadFailed, expected_result.unwrap_err());
+
+        let _ = std::fs::remove_file(CLIENT_BALANCE_FOLDER);
+
+    }
+
+    /// Scenario:
+    /// Execute generate_file_with_all_clients_balances and failed when try write in lock
+    /// Expectation:
+    /// A [CommonError] should be returned
+    #[tokio::test]
+    #[serial]
+    async fn when_generate_file_with_all_clients_balances_and_failed_try_write_in_lock_should_return_common_error(){
+        let client= create_client_info_stub();
+        let client_id= client.client_id;
+
+        let client = Client{
+            client_id:client.client_id,
+            client_name: client.client_name,
+            birth_date: client.birth_date,
+            document_number: client.document_number,
+            country: client.country,
+            balance:client.balance,
+        };
+        let mut hashmap = HashMap::new();
+        hashmap.insert(client.client_id, client);       
+        
+        let _ = tokio::fs::remove_dir_all(CLIENT_BALANCE_FOLDER).await;
+        let app_state = Arc::new(AppState{
+            clients: RwLock::new(hashmap),
+            client_id_unique: AtomicI32::new(client_id),
+        });
+        let app_state_clone = app_state.clone();
+        let _ = std::thread::spawn(move || {
+            let _write_lock = app_state_clone.clients.write().unwrap();
+            panic!("envenenando el lock");
+        }).join();
+        
+        let client_service = ClientService::new(app_state.clone());
+
+        let expected_result= client_service.generate_file_with_all_clients_balances().await;       
+
+        let folder = std::fs::read_dir(CLIENT_BALANCE_FOLDER)
+            .unwrap()
+            .filter_map(|file| file.ok())
+            .collect::<Vec<_>>();
+        assert!(folder.is_empty());
+
+        assert_eq!(CommonError::LockReadFailed, expected_result.unwrap_err());
+    }
+
+
+
 
 }
