@@ -1,7 +1,6 @@
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum CommonError {
-    NotFound,
-    InternalServerError,
+    NotFound,    
     FolderCreationFailed,
     FolderReadFailed,
     LockReadFailed,
