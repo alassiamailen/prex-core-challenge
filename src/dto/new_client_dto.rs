@@ -1,8 +1,8 @@
 use chrono::NaiveDate;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// New Client struct
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct NewClient{
     // client name
     pub client_name: String,
@@ -13,7 +13,7 @@ pub struct NewClient{
     //country
     pub country: String,
 }
-/// Unit test cases
+/// Unit tests cases
 #[cfg(test)]
 mod tests {
     use crate::stub::new_client_stub::stub::*;

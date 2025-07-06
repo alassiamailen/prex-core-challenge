@@ -14,7 +14,7 @@ pub fn map_client(new_client: NewClient, client_id: i32) -> Client {
     }
 }
 
-/// Unit test cases
+/// Unit tests cases
 #[cfg(test)]
 mod tests {
     use crate::dto::new_client_dto::NewClient;

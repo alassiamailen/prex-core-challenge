@@ -15,11 +15,10 @@ pub const CLIENT_BALANCE_PATH: &str = "/client_balance/{id}";
 /// Folder for save the client's balances
 pub const CLIENT_BALANCE_FOLDER: &str = "./store_balances";
 
-
 /// Balance file prefix
 pub const PREFIX_FILE: &str = ".DAT";
 
-/// Unit test cases
+/// Unit tests cases
 #[cfg(test)]
 mod tests {
     use crate::constants::constants::*;

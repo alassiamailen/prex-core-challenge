@@ -33,7 +33,7 @@ impl ClientController {
 }
 
 /// Maps new client end-point
-async fn map_create_new_client(
+pub async fn map_create_new_client(
     service: web::Data<DynClientService>,
     new_client: web::Json<NewClient>,
 ) -> impl Responder {
@@ -47,7 +47,7 @@ async fn map_create_new_client(
 }
 
 /// Maps new credit transaction end-point
-async fn map_create_new_credit_transaction(
+pub async fn map_create_new_credit_transaction(
     service: web::Data<DynClientService>,
     new_credit: web::Json<NewCreditTransaction>,
 ) -> impl Responder {
@@ -60,7 +60,7 @@ async fn map_create_new_credit_transaction(
     }
 }
 /// Maps new debit transaction end-point
-async fn map_create_new_debit_transaction(
+pub async fn map_create_new_debit_transaction(
     service: web::Data<DynClientService>,
     new_debit: web::Json<NewDebitTransaction>,
 ) -> impl Responder {
@@ -73,7 +73,7 @@ async fn map_create_new_debit_transaction(
     }
 }
 /// Maps create balance files
-async fn map_create_balance_files(
+pub async fn map_create_balance_files(
     service: web::Data<DynClientService>,    
 ) -> impl Responder {
     match service.generate_file_with_all_clients_balances().await {
@@ -93,16 +93,22 @@ async fn map_create_balance_files(
     }
 }
 /// Maps get client balance end-point
-async fn map_get_client_balance(
+pub async fn map_get_client_balance(
     service: web::Data<DynClientService>,
     client_id: web::Path<i32>,
 ) -> impl Responder {
     match service.get_client_balance(client_id.into_inner()).await {
         Ok(client_info) => HttpResponse::Ok().json(client_info),
         Err(error) => match error {
-            CommonError::NotFound => HttpResponse::NotFound().body("Client not found"),
-            CommonError::LockReadFailed => HttpResponse::NotFound().body("Error when reading app_state"),
+            CommonError::NotFound => HttpResponse::NotFound().body("Client not found"),           
             _ => HttpResponse::InternalServerError().body("An unexpected error occurred"),
         },
     }
+}
+
+/// Unit tests cases
+#[cfg(test)]
+mod tests {
+    
+    
 }

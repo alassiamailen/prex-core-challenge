@@ -1,8 +1,8 @@
 use rust_decimal::Decimal;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// New Debit Transaction struct
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct NewDebitTransaction {
     // client id
     pub client_id: i32,
@@ -10,7 +10,7 @@ pub struct NewDebitTransaction {
     pub debit_amount: Decimal,
 }
 
-/// Unit test cases
+/// Unit tests cases
 #[cfg(test)]
 mod tests {
     use crate::stub::client_info_stub::stub::CLIENT_ID;  

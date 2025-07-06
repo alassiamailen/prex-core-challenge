@@ -51,7 +51,7 @@ pub trait ClientServiceTrait {
 /// Client service implementation struct
 
 pub struct ClientService {
-    app_state: Arc<AppState>,
+    pub app_state: Arc<AppState>,
 }
 
 /// Initialization
@@ -422,7 +422,7 @@ impl ClientService {
 /// Client service trait dyn type
 pub type DynClientService = Arc<dyn ClientServiceTrait + Send + Sync>;
 
-/// Unit test cases
+/// Unit tests cases
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -439,6 +439,7 @@ mod tests {
     use crate::stub::new_credit_transaction_stub::stub::create_new_credit_transaction_stub;
     use crate::stub::new_debit_transaction_stub::stub::create_new_debit_transaction_stub;
 
+
     const MOCK_CLIENT_ID: i32 = 1;
     
     /// Scenario:
@@ -453,7 +454,7 @@ mod tests {
         let mut client_service_mock= MockClientServiceTrait::new();
 
         let app_state = Arc::new(AppState{
-            clients: RwLock::new(HashMap::new()),
+            clients: Arc::new(RwLock::new(HashMap::new())),
             client_id_unique: AtomicI32::new(MOCK_CLIENT_ID),
         });
         let client_service = ClientService::new(app_state);
@@ -476,7 +477,7 @@ mod tests {
     async fn when_create_new_client_with_valid_values_and_rwlock_failed_should_return_common_error(){
         let new_client= create_new_client_stub();
 
-        let client = RwLock::new(HashMap::<i32, Client>::new());
+        let client = Arc::new(RwLock::new(HashMap::<i32, Client>::new()));
 
         let mut client_service_mock= MockClientServiceTrait::new();
 
@@ -503,7 +504,7 @@ mod tests {
     }
 
 
-    // #[tokio::test]
+    // #[tokio::tests]
     // async fn when_create_new_client_with_valid_values_and_rwlock_failed_when_try_write_should_return_common_error(){
     //     let new_client= create_new_client_stub();
     //
@@ -568,7 +569,7 @@ mod tests {
         hashmap.insert(new_credit.client_id, client);
 
         let app_state = Arc::new(AppState{
-            clients: RwLock::new(hashmap),
+            clients: Arc::new(RwLock::new(hashmap)),
             client_id_unique: AtomicI32::new(new_credit.client_id),
         });
 
@@ -589,7 +590,7 @@ mod tests {
     /// A [CommonError] should be returned
     #[tokio::test]
     #[serial]
-    async fn when_create_new_credit_transaction_with_invalid_values_should_return_client_id(){
+    async fn when_create_new_credit_transaction_with_invalid_values_should_return_common_error(){
         let new_credit= create_new_credit_transaction_stub();
         let client_stub= create_new_client_stub();
 
@@ -607,7 +608,7 @@ mod tests {
         hashmap.insert(new_credit.client_id, client);
 
         let app_state = Arc::new(AppState{
-            clients: RwLock::new(hashmap),
+            clients: Arc::new(RwLock::new(hashmap)),
             client_id_unique: AtomicI32::new(new_credit.client_id),
         });
 
@@ -654,7 +655,7 @@ mod tests {
         hashmap.insert(new_debit.client_id, client);
 
         let app_state = Arc::new(AppState{
-            clients: RwLock::new(hashmap),
+            clients: Arc::new(RwLock::new(hashmap)),
             client_id_unique: AtomicI32::new(new_debit.client_id),
         });
 
@@ -674,7 +675,7 @@ mod tests {
     async fn when_create_new_debit_transaction_with_valid_values_and_rwlock_failed_should_return_common_error(){
         let new_debit= create_new_debit_transaction_stub();
 
-        let client = RwLock::new(HashMap::<i32, Client>::new());
+        let client = Arc::new(RwLock::new(HashMap::<i32, Client>::new()));
 
         let _ = std::panic::catch_unwind(|| {
             let _readlock = client.read().unwrap();
@@ -717,7 +718,7 @@ mod tests {
         hashmap.insert(client.client_id, client);
 
         let app_state = Arc::new(AppState{
-            clients: RwLock::new(hashmap),
+            clients: Arc::new(RwLock::new(hashmap)),
             client_id_unique: AtomicI32::new(client_id),
         });
 
@@ -751,7 +752,7 @@ mod tests {
         hashmap.insert(client.client_id, client);
 
         let app_state = Arc::new(AppState{
-            clients: RwLock::new(hashmap),
+            clients: Arc::new(RwLock::new(hashmap)),
             client_id_unique: AtomicI32::new(client_id),
         });
 
@@ -785,7 +786,7 @@ mod tests {
         hashmap.insert(client.client_id, client);
 
         let app_state = Arc::new(AppState{
-            clients: RwLock::new(hashmap),
+            clients: Arc::new(RwLock::new(hashmap)),
             client_id_unique: AtomicI32::new(client_id),
         });
 
@@ -834,7 +835,7 @@ mod tests {
         hashmap.insert(client.client_id, client);
 
         let app_state = Arc::new(AppState{
-            clients: RwLock::new(hashmap),
+            clients: Arc::new(RwLock::new(hashmap)),
             client_id_unique: AtomicI32::new(client_id),
         });
 
@@ -871,13 +872,13 @@ mod tests {
         
         let _ = tokio::fs::remove_dir_all(CLIENT_BALANCE_FOLDER).await;
         let app_state = Arc::new(AppState{
-            clients: RwLock::new(hashmap),
+            clients: Arc::new(RwLock::new(hashmap)),
             client_id_unique: AtomicI32::new(client_id),
         });
         let app_state_clone = app_state.clone();
         let _ = std::thread::spawn(move || {
             let _write_lock = app_state_clone.clients.write().unwrap();
-            panic!("envenenando el lock");
+            panic!("error");
         }).join();
         
         let client_service = ClientService::new(app_state.clone());

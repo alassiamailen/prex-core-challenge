@@ -19,7 +19,7 @@ pub struct ClientBalance {
     pub credit_amount: Decimal,
 }
 
-/// Unit test cases
+/// Unit tests cases
 #[cfg(test)]
 mod tests {
     use crate::stub::client_info_stub::stub::*;

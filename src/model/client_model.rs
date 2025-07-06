@@ -17,7 +17,7 @@ pub struct Client {
     // money in account
     pub balance: Decimal,
 }
-/// Unit test cases
+/// Unit tests cases
 #[cfg(test)]
 mod tests {
     use super::*;
