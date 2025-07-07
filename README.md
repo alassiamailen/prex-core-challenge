@@ -70,7 +70,6 @@ It is designed for card issuers and payment services, not for end customers.
 ### Steps to Run
 
 ```bash
-```bash
 git clone <tu-repo-url>
 cd <nombre-de-tu-proyecto>
 cargo run
