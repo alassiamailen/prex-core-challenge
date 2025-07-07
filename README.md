@@ -70,8 +70,8 @@ It is designed for card issuers and payment services, not for end customers.
 ### Steps to Run
 
 ```bash
-git clone <tu-repo-url>
-cd <nombre-de-tu-proyecto>
+git clone <repository-url>
+cd <project-name>
 cargo run
 ```
 The server runs by default at:
