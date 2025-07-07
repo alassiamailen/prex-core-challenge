@@ -1,6 +1,5 @@
 use actix_web::{web, App, HttpServer};
 use env_logger;
-use log::info;
 use prex_core_challenge::controller::client_controller::ClientController;
 use prex_core_challenge::service::client_service::{ClientService, DynClientService};
 use prex_core_challenge::state::app_state::AppState;
@@ -19,9 +18,7 @@ async fn main() -> std::io::Result<()> {
         clients: Arc::new(RwLock::new(HashMap::new())),
         client_id_unique: AtomicI32::new(1),
     };
-
-    // info!("Actix server - starting...");
-    // info!("Actix server - listening on: 0.0.0.0:8080...");
+    
     let share_state = Arc::new(app_state);
 
     // create service
