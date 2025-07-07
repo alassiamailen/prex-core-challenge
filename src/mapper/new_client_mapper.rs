@@ -27,24 +27,21 @@ mod tests {
     /// Expectation:
     /// A [Client] should be returned
     #[tokio::test]
-    async fn when_map_client_should_return_client_struct(
-    ) {
-        let expected_client= create_new_client_stub();
-        let session_id= create_client_info_stub().client_id;
-        let new_client_request= NewClient{
+    async fn when_map_client_should_return_client_struct() {
+        let expected_client = create_new_client_stub();
+        let session_id = create_client_info_stub().client_id;
+        let new_client_request = NewClient {
             client_name: expected_client.client_name.clone(),
             birth_date: expected_client.birth_date,
             document_number: expected_client.document_number.clone(),
             country: expected_client.country.clone(),
         };
         let result = map_client(new_client_request, session_id);
-        
-        assert_eq!(session_id,result.client_id);
-        assert_eq!(expected_client.client_name,result.client_name);
-        assert_eq!(expected_client.birth_date,result.birth_date);
-        assert_eq!(expected_client.document_number,result.document_number);
-        assert_eq!(expected_client.country,result.country);
-        
 
+        assert_eq!(session_id, result.client_id);
+        assert_eq!(expected_client.client_name, result.client_name);
+        assert_eq!(expected_client.birth_date, result.birth_date);
+        assert_eq!(expected_client.document_number, result.document_number);
+        assert_eq!(expected_client.country, result.country);
     }
 }

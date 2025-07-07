@@ -22,7 +22,7 @@ pub const PREFIX_FILE: &str = ".DAT";
 #[cfg(test)]
 mod tests {
     use crate::constants::constants::*;
-    
+
     /// Scenario:
     /// Creates constant with valid values
     #[test]
@@ -30,11 +30,10 @@ mod tests {
         assert_eq!("/api/v1/client", MAIN_PATH);
         assert_eq!("/new_client", NEW_CLIENT_PATH);
         assert_eq!("/new_debit_transaction", NEW_DEBIT_TRANSACTION_PATH);
-        assert_eq!("/new_credit_transaction",NEW_CREDIT_TRANSACTION_PATH);
-        assert_eq!("/store_balance",STORE_BALANCE_PATH);
-        assert_eq!("/client_balance/{id}",CLIENT_BALANCE_PATH);
-        assert_eq!("./store_balances",CLIENT_BALANCE_FOLDER);
-        assert_eq!(".DAT",PREFIX_FILE);
+        assert_eq!("/new_credit_transaction", NEW_CREDIT_TRANSACTION_PATH);
+        assert_eq!("/store_balance", STORE_BALANCE_PATH);
+        assert_eq!("/client_balance/{id}", CLIENT_BALANCE_PATH);
+        assert_eq!("./store_balances", CLIENT_BALANCE_FOLDER);
+        assert_eq!(".DAT", PREFIX_FILE);
     }
-    
 }

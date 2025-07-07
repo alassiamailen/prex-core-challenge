@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 /// New Client struct
 #[derive(Serialize, Deserialize)]
-pub struct NewClient{
+pub struct NewClient {
     // client name
     pub client_name: String,
     // client birth date
@@ -13,6 +13,7 @@ pub struct NewClient{
     //country
     pub country: String,
 }
+
 /// Unit tests cases
 #[cfg(test)]
 mod tests {
@@ -23,9 +24,9 @@ mod tests {
     /// Expectation:
     /// A [NewClient] with proper values should be created
     #[test]
-    fn when_create_new_client_with_proper_values_should_retrieve_set_values(){
-        let target= create_new_client_stub();
-        
+    fn when_create_new_client_with_proper_values_should_retrieve_set_values() {
+        let target = create_new_client_stub();
+
         assert_eq!(CLIENT_NAME, target.client_name);
         assert_eq!(CLIENT_BIRTH_DATE.clone(), target.birth_date);
         assert_eq!(CLIENT_DOCUMENT_NUMBER, target.document_number);

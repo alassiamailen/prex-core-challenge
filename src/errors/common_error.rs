@@ -1,11 +1,12 @@
+/// Type of errors
 #[derive(Debug, PartialEq)]
 pub enum CommonError {
-    NotFound,    
+    NotFound,
     FolderCreationFailed,
     FolderReadFailed,
     LockReadFailed,
     LockWriteFailed,
     FileCreationFailed,
-    FileWriteFailed,  
+    FileWriteFailed,
     Forbiden,
 }

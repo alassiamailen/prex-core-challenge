@@ -5,5 +5,5 @@ pub mod errors;
 pub mod mapper;
 pub mod model;
 pub mod service;
-pub mod stub;
 pub mod state;
+pub mod stub;

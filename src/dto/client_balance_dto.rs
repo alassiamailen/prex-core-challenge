@@ -23,22 +23,21 @@ pub struct ClientBalance {
 #[cfg(test)]
 mod tests {
     use crate::stub::client_info_stub::stub::*;
-    use crate::stub::new_client_stub::stub::*;    
+    use crate::stub::new_client_stub::stub::*;
 
     /// Scenario:
     /// Creates a [ClientBalance] struct with valid values
     /// Expectation:
     /// A [ClientBalance] with proper values should be created
     #[test]
-    fn when_create_client_balance_with_proper_values_should_retrieve_set_values(){
-        let target= create_client_info_stub();
-        
+    fn when_create_client_balance_with_proper_values_should_retrieve_set_values() {
+        let target = create_client_info_stub();
+
         assert_eq!(CLIENT_ID, target.client_id);
         assert_eq!(CLIENT_NAME, target.client_name);
         assert_eq!(CLIENT_BIRTH_DATE.clone(), target.birth_date);
         assert_eq!(CLIENT_DOCUMENT_NUMBER, target.document_number);
         assert_eq!(CLIENT_COUNTRY, target.country);
         assert_eq!(CLIENT_BALANCE.clone(), target.balance);
-        
     }
 }
