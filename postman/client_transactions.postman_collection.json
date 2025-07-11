@@ -1,0 +1,232 @@
+{
+  "info": {
+    "_postman_id": "abcdef12-3456-7890-abcd-ef1234567890",
+    "name": "PrexCORE Client Transactions API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Collection for testing client and transaction endpoints."
+  },
+  "item": [
+    {
+      "name": "Client",
+      "item": [
+        {
+          "name": "Create Client - Mailen Alassia",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"client_name\": \"Mailen Alassia\",\n    \"birth_date\": \"1998-04-23\",\n    \"document_number\": \"12345670\",\n    \"country\": \"Argentina\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/client/new_client",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "client",
+                "new_client"
+              ]
+            },
+            "description": "Creates a new client: Mailen Alassia"
+          }
+        },
+        {
+          "name": "Create Client - Benito Ocasio",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"client_name\": \"Benito Ocasio\",\n    \"birth_date\": \"1994-03-10\",\n    \"document_number\": \"32145678\",\n    \"country\": \"Argentina\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/client/new_client",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "client",
+                "new_client"
+              ]
+            },
+            "description": "Creates a new client: Benito Ocasio"
+          }
+        },
+        {
+          "name": "Get Client Balance",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/client/client_balance/{{id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "client",
+                "client_balance",
+                "{{id}}"
+              ]
+            },
+            "description": "Retrieves the balance for a specific client by ID."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "item": [
+        {
+          "name": "Create Credit - Client 1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"client_id\": 1,\n    \"credit_amount\": 500.12\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/client/new_credit_transaction",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "client",
+                "new_credit_transaction"
+              ]
+            },
+            "description": "Creates a credit transaction for client ID 1"
+          }
+        },
+        {
+          "name": "Create Credit - Client 2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"client_id\": 2,\n    \"credit_amount\": 19999.35\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/client/new_credit_transaction",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "client",
+                "new_credit_transaction"
+              ]
+            },
+            "description": "Creates a credit transaction for client ID 2"
+          }
+        },
+        {
+          "name": "Create Debit - Client 1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"client_id\": 1,\n    \"debit_amount\": 100\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/client/new_debit_transaction",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "client",
+                "new_debit_transaction"
+              ]
+            },
+            "description": "Creates a debit transaction for client ID 1"
+          }
+        },
+        {
+          "name": "Create Debit - Client 2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"client_id\": 2,\n    \"debit_amount\": 100\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/client/new_debit_transaction",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "client",
+                "new_debit_transaction"
+              ]
+            },
+            "description": "Creates a debit transaction for client ID 2"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "Generate File Balance",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/client/store_balance",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "client",
+                "store_balance"
+              ]
+            },
+            "description": "Generates a balance file for all clients."
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080/api/v1"
+    },
+    {
+      "key": "id",
+      "value": "1"
+    }
+  ]
+}
