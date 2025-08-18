@@ -1,4 +1,4 @@
-# Payment Processor - PrexCORE Challenge
+# Payment Processor 
 
 ![Rust](https://img.shields.io/badge/Rust-1.70.0-orange?logo=rust) ![Actix Web](https://img.shields.io/badge/Actix-Web-blue)
 
