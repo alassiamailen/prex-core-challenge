@@ -9,4 +9,5 @@ pub enum CommonError {
     FileCreationFailed,
     FileWriteFailed,
     Forbiden,
+    InvalidAmount,
 }
