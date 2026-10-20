@@ -6,8 +6,9 @@ use prex_core_challenge::constants::constants::{
 use prex_core_challenge::controller::client_controller::*;
 use prex_core_challenge::dto::new_client_dto::NewClient;
 use prex_core_challenge::model::client_model::Client;
+use prex_core_challenge::service::authorization_service::AuthorizationService;
 use prex_core_challenge::service::client_service::{ClientService, DynClientService};
-use prex_core_challenge::state::app_state::AppState;
+use prex_core_challenge::state::app_state::{AppData, AppState};
 use prex_core_challenge::stub::client_info_stub::stub::{create_client_info_stub, CLIENT_ID};
 use prex_core_challenge::stub::new_client_stub::stub::create_new_client_stub;
 use prex_core_challenge::stub::new_credit_transaction_stub::stub::create_new_credit_transaction_stub;
@@ -36,17 +37,22 @@ async fn when_map_create_new_client_should_insert_into_app_state() {
     };
 
     let app_state = Arc::new(AppState {
-        clients: Arc::new(RwLock::new(HashMap::new())),
+        data: Arc::new(RwLock::new(AppData {
+            clients: HashMap::new(),
+            transactions: HashMap::new(),
+        })),
         client_id_unique: AtomicI32::new(CLIENT_ID),
+        transaction_id_unique: AtomicI32::new(1),
     });
 
-    let client_service = ClientService {
-        app_state: Arc::clone(&app_state),
-    };
+    let authorization_service = Arc::new(AuthorizationService::new());
+
+    let client_service = ClientService::new(Arc::clone(&app_state), authorization_service);
 
     let dyn_client_service: DynClientService = Arc::new(client_service);
 
-    let client_controller = ClientController::new(dyn_client_service.clone());
+    let client_controller = ClientController::new();
+
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(dyn_client_service))
@@ -58,6 +64,9 @@ async fn when_map_create_new_client_should_insert_into_app_state() {
 
     let req = test::TestRequest::post()
         .uri(&path)
+        .insert_header(("X-User-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Client-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Role", "SuperAdmin"))
         .set_json(&new_client)
         .to_request();
 
@@ -67,12 +76,15 @@ async fn when_map_create_new_client_should_insert_into_app_state() {
     let body: i32 = test::read_body_json(resp).await;
     assert_eq!(body, CLIENT_ID);
 
-    let client_in_app_state = app_state.clients.read().unwrap();
-    let client = client_in_app_state
+    let app_data = app_state.data.read().unwrap();
+
+    let client = app_data
+        .clients
         .get(&CLIENT_ID)
         .expect("client should exist");
     assert_eq!(client.document_number, client_stub.document_number);
 }
+
 /// Scenario:
 /// Execute map_create_new_client when [NewClient] with this document number all ready exists
 /// Expectation:
@@ -102,18 +114,22 @@ async fn when_map_create_new_client_and_this_all_ready_exists_should_return_comm
     hashmap.insert(CLIENT_ID, client_exists);
 
     let app_state = Arc::new(AppState {
-        clients: Arc::new(RwLock::new(hashmap)),
+        data: Arc::new(RwLock::new(AppData {
+            clients: hashmap,
+            transactions: HashMap::new(),
+        })),
         client_id_unique: AtomicI32::new(CLIENT_ID),
+        transaction_id_unique: AtomicI32::new(1),
     });
 
-    let client_service = ClientService {
-        app_state: Arc::clone(&app_state),
-    };
+    let authorization_service = Arc::new(AuthorizationService::new());
+
+    let client_service = ClientService::new(Arc::clone(&app_state), authorization_service);
 
     let dyn_client_service: DynClientService = Arc::new(client_service);
     let path = format!("{}{}", MAIN_PATH, NEW_CLIENT_PATH);
 
-    let client_controller = ClientController::new(dyn_client_service.clone());
+    let client_controller = ClientController::new();
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(dyn_client_service))
@@ -123,6 +139,9 @@ async fn when_map_create_new_client_and_this_all_ready_exists_should_return_comm
 
     let req = test::TestRequest::post()
         .uri(&path)
+        .insert_header(("X-User-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Client-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Role", "SuperAdmin"))
         .set_json(&new_client)
         .to_request();
 
@@ -145,30 +164,36 @@ async fn when_map_create_new_client_and_read_app_state_failed_should_return_comm
         country: client_stub.country,
     };
 
-    let client = Arc::new(RwLock::new(HashMap::<i32, Client>::new()));
-    let clients_ref = Arc::clone(&client);
+    let data = Arc::new(RwLock::new(AppData {
+        clients: HashMap::new(),
+        transactions: HashMap::new(),
+    }));
+
+    let data_ref = Arc::clone(&data);
 
     {
         let _ = std::thread::spawn(move || {
-            let _guard = clients_ref.write().unwrap();
+            let _guard = data_ref.write().unwrap();
             panic!("error trying write");
         })
         .join();
     }
 
     let app_state = Arc::new(AppState {
-        clients: client,
+        data,
         client_id_unique: AtomicI32::new(CLIENT_ID),
+        transaction_id_unique: AtomicI32::new(1),
     });
 
-    let client_service = ClientService {
-        app_state: Arc::clone(&app_state),
-    };
+    let authorization_service = Arc::new(AuthorizationService::new());
+
+    let client_service = ClientService::new(Arc::clone(&app_state), authorization_service);
 
     let dyn_client_service: DynClientService = Arc::new(client_service);
+
     let path = format!("{}{}", MAIN_PATH, NEW_CLIENT_PATH);
 
-    let client_controller = ClientController::new(dyn_client_service.clone());
+    let client_controller = ClientController::new();
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(dyn_client_service))
@@ -178,6 +203,9 @@ async fn when_map_create_new_client_and_read_app_state_failed_should_return_comm
 
     let req = test::TestRequest::post()
         .uri(&path)
+        .insert_header(("X-User-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Client-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Role", "SuperAdmin"))
         .set_json(&new_client)
         .to_request();
 
@@ -206,18 +234,22 @@ async fn when_map_create_new_credit_transaction_is_valid_should_update_app_state
     hashmap.insert(new_credit.client_id, client);
 
     let app_state = Arc::new(AppState {
-        clients: Arc::new(RwLock::new(hashmap)),
+        data: Arc::new(RwLock::new(AppData {
+            clients: hashmap,
+            transactions: HashMap::new(),
+        })),
         client_id_unique: AtomicI32::new(new_credit.client_id),
+        transaction_id_unique: AtomicI32::new(1),
     });
 
-    let client_service = ClientService {
-        app_state: Arc::clone(&app_state),
-    };
+    let authorization_service = Arc::new(AuthorizationService::new());
+
+    let client_service = ClientService::new(Arc::clone(&app_state), authorization_service);
 
     let dyn_client_service: DynClientService = Arc::new(client_service);
     let path = format!("{}{}", MAIN_PATH, NEW_CREDIT_TRANSACTION_PATH);
 
-    let client_controller = ClientController::new(dyn_client_service.clone());
+    let client_controller = ClientController::new();
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(dyn_client_service))
@@ -227,16 +259,22 @@ async fn when_map_create_new_credit_transaction_is_valid_should_update_app_state
 
     let req = test::TestRequest::post()
         .uri(&path)
+        .insert_header(("X-User-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Client-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Role", "User"))
         .set_json(&new_credit)
         .to_request();
 
     let resp = test::call_service(&app, req).await;
     assert!(resp.status().is_success());
 
-    let client_in_app_state = app_state.clients.read().unwrap();
-    let client = client_in_app_state
+    let app_data = app_state.data.read().unwrap();
+
+    let client = app_data
+        .clients
         .get(&CLIENT_ID)
         .expect("error searching client");
+
     assert_eq!(client.balance, expected_balance);
 }
 
@@ -249,31 +287,35 @@ async fn when_map_create_new_credit_transaction_and_read_app_state_failed_should
 ) {
     let new_credit = create_new_credit_transaction_stub();
 
-    let client = Arc::new(RwLock::new(HashMap::<i32, Client>::new()));
+    let data = Arc::new(RwLock::new(AppData {
+        clients: HashMap::new(),
+        transactions: HashMap::new(),
+    }));
 
-    let clients_ref = Arc::clone(&client);
+    let data_ref = Arc::clone(&data);
 
     {
         let _ = std::thread::spawn(move || {
-            let _guard = clients_ref.write().unwrap();
+            let _guard = data_ref.write().unwrap();
             panic!("error trying write");
         })
         .join();
     }
 
     let app_state = Arc::new(AppState {
-        clients: client,
+        data,
         client_id_unique: AtomicI32::new(CLIENT_ID),
+        transaction_id_unique: AtomicI32::new(1),
     });
 
-    let client_service = ClientService {
-        app_state: Arc::clone(&app_state),
-    };
+    let authorization_service = Arc::new(AuthorizationService::new());
+
+    let client_service = ClientService::new(Arc::clone(&app_state), authorization_service);
 
     let dyn_client_service: DynClientService = Arc::new(client_service);
     let path = format!("{}{}", MAIN_PATH, NEW_CREDIT_TRANSACTION_PATH);
 
-    let client_controller = ClientController::new(dyn_client_service.clone());
+    let client_controller = ClientController::new();
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(dyn_client_service))
@@ -283,6 +325,9 @@ async fn when_map_create_new_credit_transaction_and_read_app_state_failed_should
 
     let req = test::TestRequest::post()
         .uri(&path)
+        .insert_header(("X-User-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Client-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Role", "User"))
         .set_json(&new_credit)
         .to_request();
 
@@ -313,18 +358,22 @@ async fn when_map_create_new_credit_transaction_and_client_id_does_not_exist_sho
     hashmap.insert(CLIENT_ID, client_exists);
 
     let app_state = Arc::new(AppState {
-        clients: Arc::new(RwLock::new(hashmap)),
+        data: Arc::new(RwLock::new(AppData {
+            clients: hashmap,
+            transactions: HashMap::new(),
+        })),
         client_id_unique: AtomicI32::new(CLIENT_ID),
+        transaction_id_unique: AtomicI32::new(1),
     });
 
-    let client_service = ClientService {
-        app_state: Arc::clone(&app_state),
-    };
+    let authorization_service = Arc::new(AuthorizationService::new());
+
+    let client_service = ClientService::new(Arc::clone(&app_state), authorization_service);
 
     let dyn_client_service: DynClientService = Arc::new(client_service);
     let path = format!("{}{}", MAIN_PATH, NEW_CREDIT_TRANSACTION_PATH);
 
-    let client_controller = ClientController::new(dyn_client_service.clone());
+    let client_controller = ClientController::new();
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(dyn_client_service))
@@ -337,6 +386,9 @@ async fn when_map_create_new_credit_transaction_and_client_id_does_not_exist_sho
 
     let req = test::TestRequest::post()
         .uri(&path)
+        .insert_header(("X-User-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Client-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Role", "SuperAdmin"))
         .set_json(&new_credit)
         .to_request();
 
@@ -365,18 +417,22 @@ async fn when_map_create_new_debit_transaction_is_valid_should_update_app_state(
     hashmap.insert(new_debit.client_id, client);
 
     let app_state = Arc::new(AppState {
-        clients: Arc::new(RwLock::new(hashmap)),
+        data: Arc::new(RwLock::new(AppData {
+            clients: hashmap,
+            transactions: HashMap::new(),
+        })),
         client_id_unique: AtomicI32::new(new_debit.client_id),
+        transaction_id_unique: AtomicI32::new(1),
     });
 
-    let client_service = ClientService {
-        app_state: Arc::clone(&app_state),
-    };
+    let authorization_service = Arc::new(AuthorizationService::new());
+
+    let client_service = ClientService::new(Arc::clone(&app_state), authorization_service);
 
     let dyn_client_service: DynClientService = Arc::new(client_service);
     let path = format!("{}{}", MAIN_PATH, NEW_DEBIT_TRANSACTION_PATH);
 
-    let client_controller = ClientController::new(dyn_client_service.clone());
+    let client_controller = ClientController::new();
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(dyn_client_service))
@@ -386,16 +442,22 @@ async fn when_map_create_new_debit_transaction_is_valid_should_update_app_state(
 
     let req = test::TestRequest::post()
         .uri(&path)
+        .insert_header(("X-User-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Client-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Role", "User"))
         .set_json(&new_debit)
         .to_request();
 
     let resp = test::call_service(&app, req).await;
     assert!(resp.status().is_success());
 
-    let client_in_app_state = app_state.clients.read().unwrap();
-    let client = client_in_app_state
+    let app_data = app_state.data.read().unwrap();
+
+    let client = app_data
+        .clients
         .get(&CLIENT_ID)
         .expect("error searching client");
+
     assert_eq!(client.balance, Decimal::zero());
 }
 /// Scenario:
@@ -407,31 +469,35 @@ async fn when_map_create_new_debit_transaction_and_read_app_state_failed_should_
 ) {
     let new_debit = create_new_debit_transaction_stub();
 
-    let client = Arc::new(RwLock::new(HashMap::<i32, Client>::new()));
+    let data = Arc::new(RwLock::new(AppData {
+        clients: HashMap::new(),
+        transactions: HashMap::new(),
+    }));
 
-    let clients_ref = Arc::clone(&client);
+    let data_ref = Arc::clone(&data);
 
     {
         let _ = std::thread::spawn(move || {
-            let _guard = clients_ref.write().unwrap();
+            let _guard = data_ref.write().unwrap();
             panic!("error trying write");
         })
         .join();
     }
 
     let app_state = Arc::new(AppState {
-        clients: client,
+        data,
         client_id_unique: AtomicI32::new(CLIENT_ID),
+        transaction_id_unique: AtomicI32::new(1),
     });
 
-    let client_service = ClientService {
-        app_state: Arc::clone(&app_state),
-    };
+    let authorization_service = Arc::new(AuthorizationService::new());
+
+    let client_service = ClientService::new(Arc::clone(&app_state), authorization_service);
 
     let dyn_client_service: DynClientService = Arc::new(client_service);
     let path = format!("{}{}", MAIN_PATH, NEW_DEBIT_TRANSACTION_PATH);
 
-    let client_controller = ClientController::new(dyn_client_service.clone());
+    let client_controller = ClientController::new();
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(dyn_client_service))
@@ -441,6 +507,9 @@ async fn when_map_create_new_debit_transaction_and_read_app_state_failed_should_
 
     let req = test::TestRequest::post()
         .uri(&path)
+        .insert_header(("X-User-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Client-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Role", "User"))
         .set_json(&new_debit)
         .to_request();
 
@@ -471,18 +540,22 @@ async fn when_map_create_new_debit_transaction_and_client_id_does_not_exist_shou
     hashmap.insert(CLIENT_ID, client_exists);
 
     let app_state = Arc::new(AppState {
-        clients: Arc::new(RwLock::new(hashmap)),
+        data: Arc::new(RwLock::new(AppData {
+            clients: hashmap,
+            transactions: HashMap::new(),
+        })),
         client_id_unique: AtomicI32::new(CLIENT_ID),
+        transaction_id_unique: AtomicI32::new(1),
     });
 
-    let client_service = ClientService {
-        app_state: Arc::clone(&app_state),
-    };
+    let authorization_service = Arc::new(AuthorizationService::new());
+
+    let client_service = ClientService::new(Arc::clone(&app_state), authorization_service);
 
     let dyn_client_service: DynClientService = Arc::new(client_service);
     let path = format!("{}{}", MAIN_PATH, NEW_DEBIT_TRANSACTION_PATH);
 
-    let client_controller = ClientController::new(dyn_client_service.clone());
+    let client_controller = ClientController::new();
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(dyn_client_service))
@@ -495,6 +568,9 @@ async fn when_map_create_new_debit_transaction_and_client_id_does_not_exist_shou
 
     let req = test::TestRequest::post()
         .uri(&path)
+        .insert_header(("X-User-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Client-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Role", "SuperAdmin"))
         .set_json(&new_debit)
         .to_request();
 
@@ -523,13 +599,17 @@ async fn when_map_get_client_balance_should_get_client() {
     hashmap.insert(CLIENT_ID, client_exists);
 
     let app_state = Arc::new(AppState {
-        clients: Arc::new(RwLock::new(hashmap)),
+        data: Arc::new(RwLock::new(AppData {
+            clients: hashmap,
+            transactions: HashMap::new(),
+        })),
         client_id_unique: AtomicI32::new(CLIENT_ID),
+        transaction_id_unique: AtomicI32::new(1),
     });
 
-    let client_service = ClientService {
-        app_state: Arc::clone(&app_state),
-    };
+    let authorization_service = Arc::new(AuthorizationService::new());
+
+    let client_service = ClientService::new(Arc::clone(&app_state), authorization_service);
 
     let dyn_client_service: DynClientService = Arc::new(client_service);
     let route_pattern = format!("{}{}{{id}}", MAIN_PATH, MOCK_CLIENT_BALANCE_PATH);
@@ -543,13 +623,20 @@ async fn when_map_get_client_balance_should_get_client() {
 
     let path = format!("{}{}{}", MAIN_PATH, MOCK_CLIENT_BALANCE_PATH, CLIENT_ID);
 
-    let req = test::TestRequest::post().uri(&path).to_request();
+    let req = test::TestRequest::post()
+        .uri(&path)
+        .insert_header(("X-User-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Client-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Role", "User"))
+        .to_request();
 
     let resp = test::call_service(&app, req).await;
     assert!(resp.status().is_success());
 
-    let client_in_app_state = app_state.clients.read().unwrap();
-    let client = client_in_app_state
+    let app_data = app_state.data.read().unwrap();
+
+    let client = app_data
+        .clients
         .get(&CLIENT_ID)
         .expect("error searching client");
 
@@ -577,13 +664,17 @@ async fn when_map_get_client_balance_and_client_id_is_invalid_should_common_erro
     hashmap.insert(CLIENT_ID, client_exists);
 
     let app_state = Arc::new(AppState {
-        clients: Arc::new(RwLock::new(hashmap)),
+        data: Arc::new(RwLock::new(AppData {
+            clients: hashmap,
+            transactions: HashMap::new(),
+        })),
         client_id_unique: AtomicI32::new(CLIENT_ID),
+        transaction_id_unique: AtomicI32::new(1),
     });
 
-    let client_service = ClientService {
-        app_state: Arc::clone(&app_state),
-    };
+    let authorization_service = Arc::new(AuthorizationService::new());
+
+    let client_service = ClientService::new(Arc::clone(&app_state), authorization_service);
 
     let dyn_client_service: DynClientService = Arc::new(client_service);
     let route_pattern = format!("{}{}{{id}}", MAIN_PATH, MOCK_CLIENT_BALANCE_PATH);
@@ -600,7 +691,12 @@ async fn when_map_get_client_balance_and_client_id_is_invalid_should_common_erro
         MAIN_PATH, MOCK_CLIENT_BALANCE_PATH, MOCK_CLIENT_ID
     );
 
-    let req = test::TestRequest::post().uri(&path).to_request();
+    let req = test::TestRequest::post()
+        .uri(&path)
+        .insert_header(("X-User-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Client-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Role", "SuperAdmin"))
+        .to_request();
 
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), http::StatusCode::NOT_FOUND);
@@ -612,26 +708,30 @@ async fn when_map_get_client_balance_and_client_id_is_invalid_should_common_erro
 /// A [StatusCode::INTERNAL_SERVER_ERROR] should be returned
 #[actix_web::test]
 async fn when_map_get_client_balance_and_read_app_state_failed_should_common_error() {
-    let client = Arc::new(RwLock::new(HashMap::<i32, Client>::new()));
+    let data = Arc::new(RwLock::new(AppData {
+        clients: HashMap::new(),
+        transactions: HashMap::new(),
+    }));
 
-    let clients_ref = Arc::clone(&client);
+    let data_ref = Arc::clone(&data);
 
     {
         let _ = std::thread::spawn(move || {
-            let _guard = clients_ref.write().unwrap();
+            let _guard = data_ref.write().unwrap();
             panic!("error trying write");
         })
         .join();
     }
 
     let app_state = Arc::new(AppState {
-        clients: client,
+        data,
         client_id_unique: AtomicI32::new(CLIENT_ID),
+        transaction_id_unique: AtomicI32::new(1),
     });
 
-    let client_service = ClientService {
-        app_state: Arc::clone(&app_state),
-    };
+    let authorization_service = Arc::new(AuthorizationService::new());
+
+    let client_service = ClientService::new(Arc::clone(&app_state), authorization_service);
 
     let dyn_client_service: DynClientService = Arc::new(client_service);
     let route_pattern = format!("{}{}{{id}}", MAIN_PATH, MOCK_CLIENT_BALANCE_PATH);
@@ -645,7 +745,12 @@ async fn when_map_get_client_balance_and_read_app_state_failed_should_common_err
 
     let path = format!("{}{}{}", MAIN_PATH, MOCK_CLIENT_BALANCE_PATH, CLIENT_ID);
 
-    let req = test::TestRequest::post().uri(&path).to_request();
+    let req = test::TestRequest::post()
+        .uri(&path)
+        .insert_header(("X-User-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Client-Id", CLIENT_ID.to_string()))
+        .insert_header(("X-Role", "User"))
+        .to_request();
 
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), http::StatusCode::INTERNAL_SERVER_ERROR);

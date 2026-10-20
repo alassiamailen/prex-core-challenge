@@ -1,1 +1,7 @@
 /target
+
+# Local IDE configuration
+.idea/
+
+# Generated balance files
+/store_balances/

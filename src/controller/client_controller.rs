@@ -2,26 +2,22 @@ use crate::constants::constants::{
     CLIENT_BALANCE_PATH, MAIN_PATH, NEW_CLIENT_PATH, NEW_CREDIT_TRANSACTION_PATH,
     NEW_DEBIT_TRANSACTION_PATH, STORE_BALANCE_PATH,
 };
+use crate::controller::request::user_extractor::extract_user_from_headers;
 use crate::dto::new_client_dto::NewClient;
 use crate::dto::new_credit_transaction::NewCreditTransaction;
 use crate::dto::new_debit_transaction::NewDebitTransaction;
 use crate::errors::common_error::CommonError;
 use crate::service::client_service::DynClientService;
-
-use actix_web::{self, web, HttpResponse, Responder, Scope};
+use actix_web::{self, web, HttpRequest, HttpResponse, Responder, Scope};
 
 /// Client controller
 #[derive(Clone)]
-pub struct ClientController {
-    client_service: DynClientService,
-}
+pub struct ClientController;
 
 /// Implementation Client controller
 impl ClientController {
-    pub fn new(service: DynClientService) -> Self {
-        Self {
-            client_service: service,
-        }
+    pub fn new() -> Self {
+        Self
     }
     /// Configure declared endpoints for this controller
     pub fn create_routes(&self) -> Scope {
@@ -42,10 +38,20 @@ impl ClientController {
 
 /// Maps new client end-point
 pub async fn map_create_new_client(
+    request: HttpRequest,
     service: web::Data<DynClientService>,
     new_client: web::Json<NewClient>,
 ) -> impl Responder {
-    match service.create_new_client(new_client.into_inner()).await {
+    let user = match extract_user_from_headers(&request) {
+        Ok(user) => user,
+        Err(_) => {
+            return HttpResponse::Unauthorized().body("Invalid user identity");
+        }
+    };
+    match service
+        .create_new_client(&user, new_client.into_inner())
+        .await
+    {
         Ok(id) => HttpResponse::Ok().json(id),
         Err(error) => match error {
             CommonError::Forbiden => {
@@ -59,16 +65,25 @@ pub async fn map_create_new_client(
 
 /// Maps new credit transaction end-point
 pub async fn map_create_new_credit_transaction(
+    request: HttpRequest,
     service: web::Data<DynClientService>,
     new_credit: web::Json<NewCreditTransaction>,
 ) -> impl Responder {
+    let user = match extract_user_from_headers(&request) {
+        Ok(user) => user,
+        Err(_) => {
+            return HttpResponse::Unauthorized().body("Invalid user identity");
+        }
+    };
     match service
-        .create_new_credit_transaction(new_credit.into_inner())
+        .create_new_credit_transaction(&user, new_credit.into_inner())
         .await
     {
         Ok(balance) => HttpResponse::Ok().json(balance),
+
         Err(error) => match error {
             CommonError::NotFound => HttpResponse::NotFound().body("Client not found"),
+            CommonError::Forbiden => HttpResponse::Forbidden().body("The user is not authorized"),
             _ => HttpResponse::InternalServerError()
                 .body("Error creating new client. Try again later."),
         },
@@ -76,48 +91,86 @@ pub async fn map_create_new_credit_transaction(
 }
 /// Maps new debit transaction end-point
 pub async fn map_create_new_debit_transaction(
+    request: HttpRequest,
     service: web::Data<DynClientService>,
     new_debit: web::Json<NewDebitTransaction>,
 ) -> impl Responder {
+    let user = match extract_user_from_headers(&request) {
+        Ok(user) => user,
+        Err(_) => {
+            return HttpResponse::Unauthorized().body("Invalid user identity");
+        }
+    };
     match service
-        .create_new_debit_transaction(new_debit.into_inner())
+        .create_new_debit_transaction(&user, new_debit.into_inner())
         .await
     {
         Ok(balance) => HttpResponse::Ok().json(balance),
         Err(error) => match error {
             CommonError::NotFound => HttpResponse::NotFound().body("Client not found"),
+            CommonError::Forbiden => HttpResponse::Forbidden().body("The user is not authorized"),
             _ => HttpResponse::InternalServerError()
                 .body("Error creating new client. Try again later."),
         },
     }
 }
 /// Maps create balance files
-pub async fn map_create_balance_files(service: web::Data<DynClientService>) -> impl Responder {
-    match service.generate_file_with_all_clients_balances().await {
-        Ok(_) => HttpResponse::Ok().body("File created successfully"),
-        Err(error) => {
-            let message = match error {
-                CommonError::FolderCreationFailed => "Error when creating folder",
-                CommonError::FolderReadFailed => "Error when reading folder",
-                CommonError::LockReadFailed => "Error when reading app_state",
-                CommonError::LockWriteFailed => "Error when writing app_state",
-                CommonError::FileCreationFailed => "Error when creating file",
-                CommonError::FileWriteFailed => "Error when writing to the file",
-                _ => "An unexpected error occurred",
-            };
-            HttpResponse::InternalServerError().body(message)
+pub async fn map_create_balance_files(
+    request: HttpRequest,
+    service: web::Data<DynClientService>,
+) -> impl Responder {
+    let user = match extract_user_from_headers(&request) {
+        Ok(user) => user,
+        Err(_) => {
+            return HttpResponse::Unauthorized().body("Invalid user identity");
         }
+    };
+    match service.generate_file_with_all_clients_balances(&user).await {
+        Ok(_) => HttpResponse::Ok().body("File created successfully"),
+        Err(error) => match error {
+            CommonError::Forbiden => HttpResponse::Forbidden().body("The user is not authorized"),
+            CommonError::FolderCreationFailed => {
+                HttpResponse::InternalServerError().body("Error when creating folder")
+            }
+            CommonError::FolderReadFailed => {
+                HttpResponse::InternalServerError().body("Error when reading folder")
+            }
+            CommonError::LockReadFailed => {
+                HttpResponse::InternalServerError().body("Error when reading app_state")
+            }
+            CommonError::LockWriteFailed => {
+                HttpResponse::InternalServerError().body("Error when writing app_state")
+            }
+            CommonError::FileCreationFailed => {
+                HttpResponse::InternalServerError().body("Error when creating file")
+            }
+            CommonError::FileWriteFailed => {
+                HttpResponse::InternalServerError().body("Error when writing to the file")
+            }
+            _ => HttpResponse::InternalServerError().body("An unexpected error occurred"),
+        },
     }
 }
 /// Maps get client balance end-point
 pub async fn map_get_client_balance(
+    request: HttpRequest,
     service: web::Data<DynClientService>,
     client_id: web::Path<i32>,
 ) -> impl Responder {
-    match service.get_client_balance(client_id.into_inner()).await {
+    let user = match extract_user_from_headers(&request) {
+        Ok(user) => user,
+        Err(_) => {
+            return HttpResponse::Unauthorized().body("Invalid user identity");
+        }
+    };
+    match service
+        .get_client_balance(&user, client_id.into_inner())
+        .await
+    {
         Ok(client_info) => HttpResponse::Ok().json(client_info),
         Err(error) => match error {
             CommonError::NotFound => HttpResponse::NotFound().body("Client not found"),
+            CommonError::Forbiden => HttpResponse::Forbidden().body("The user is not authorized"),
             _ => HttpResponse::InternalServerError().body("An unexpected error occurred"),
         },
     }
@@ -148,6 +201,8 @@ mod tests {
     use std::sync::Arc;
 
     const MOCK_CLIENT_BALANCE_PATH: &str = "/client_balance/";
+    const MOCK_CLIENT_ID: i32 = 1;
+    const MOCK_USER_ID: i32 = 1;
 
     ///Scenario:
     /// Executes map_create_new_client endpoint flow
@@ -160,7 +215,7 @@ mod tests {
 
         mock_service
             .expect_create_new_client()
-            .return_once(move |_p1| Box::pin(future::ready(Ok(CLIENT_ID))));
+            .return_once(move |_p1, _p2| Box::pin(future::ready(Ok(CLIENT_ID))));
 
         let path = format!("{}{}", MAIN_PATH, NEW_CLIENT_PATH);
         let app = test::init_service(
@@ -172,6 +227,9 @@ mod tests {
 
         let req = test::TestRequest::post()
             .uri(&path)
+            .insert_header(("X-User-Id", MOCK_USER_ID.to_string()))
+            .insert_header(("X-Client-Id", MOCK_CLIENT_ID.to_string()))
+            .insert_header(("X-Role", "User"))
             .set_json(&new_client)
             .to_request();
 
@@ -194,7 +252,7 @@ mod tests {
 
         mock_service
             .expect_create_new_client()
-            .return_once(move |_p1| Box::pin(future::ready(Err(CommonError::Forbiden))));
+            .return_once(move |_p1, _p2| Box::pin(future::ready(Err(CommonError::Forbiden))));
 
         let path = format!("{}{}", MAIN_PATH, NEW_CLIENT_PATH);
 
@@ -207,6 +265,9 @@ mod tests {
 
         let req = test::TestRequest::post()
             .uri(&path)
+            .insert_header(("X-User-Id", MOCK_USER_ID.to_string()))
+            .insert_header(("X-Client-Id", MOCK_CLIENT_ID.to_string()))
+            .insert_header(("X-Role", "SuperAdmin"))
             .set_json(&new_client)
             .to_request();
 
@@ -226,7 +287,7 @@ mod tests {
 
         mock_service
             .expect_create_new_credit_transaction()
-            .return_once(move |_p1| Box::pin(future::ready(Ok(expected_balance))));
+            .return_once(move |_p1, _p2| Box::pin(future::ready(Ok(expected_balance))));
 
         let path = format!("{}{}", MAIN_PATH, NEW_CREDIT_TRANSACTION_PATH);
 
@@ -239,6 +300,9 @@ mod tests {
 
         let req = test::TestRequest::post()
             .uri(&path)
+            .insert_header(("X-User-Id", MOCK_USER_ID.to_string()))
+            .insert_header(("X-Client-Id", MOCK_CLIENT_ID.to_string()))
+            .insert_header(("X-Role", "User"))
             .set_json(&new_credit)
             .to_request();
 
@@ -261,7 +325,7 @@ mod tests {
 
         mock_service
             .expect_create_new_credit_transaction()
-            .return_once(move |_p1| Box::pin(future::ready(Err(CommonError::NotFound))));
+            .return_once(move |_p1, _p2| Box::pin(future::ready(Err(CommonError::NotFound))));
 
         let path = format!("{}{}", MAIN_PATH, NEW_CREDIT_TRANSACTION_PATH);
 
@@ -274,6 +338,9 @@ mod tests {
 
         let req = test::TestRequest::post()
             .uri(&path)
+            .insert_header(("X-User-Id", MOCK_USER_ID.to_string()))
+            .insert_header(("X-Client-Id", MOCK_CLIENT_ID.to_string()))
+            .insert_header(("X-Role", "User"))
             .set_json(&new_credit)
             .to_request();
 
@@ -293,7 +360,7 @@ mod tests {
 
         mock_service
             .expect_create_new_debit_transaction()
-            .return_once(move |_p1| Box::pin(future::ready(Ok(expected_balance))));
+            .return_once(move |_p1, _p2| Box::pin(future::ready(Ok(expected_balance))));
 
         let path = format!("{}{}", MAIN_PATH, NEW_DEBIT_TRANSACTION_PATH);
 
@@ -306,6 +373,9 @@ mod tests {
 
         let req = test::TestRequest::post()
             .uri(&path)
+            .insert_header(("X-User-Id", MOCK_USER_ID.to_string()))
+            .insert_header(("X-Client-Id", MOCK_CLIENT_ID.to_string()))
+            .insert_header(("X-Role", "User"))
             .set_json(&new_debit)
             .to_request();
 
@@ -327,7 +397,7 @@ mod tests {
 
         mock_service
             .expect_create_new_debit_transaction()
-            .return_once(move |_p1| Box::pin(future::ready(Err(CommonError::NotFound))));
+            .return_once(move |_p1, _p2| Box::pin(future::ready(Err(CommonError::NotFound))));
 
         let path = format!("{}{}", MAIN_PATH, NEW_DEBIT_TRANSACTION_PATH);
 
@@ -340,6 +410,9 @@ mod tests {
 
         let req = test::TestRequest::post()
             .uri(&path)
+            .insert_header(("X-User-Id", MOCK_USER_ID.to_string()))
+            .insert_header(("X-Client-Id", MOCK_CLIENT_ID.to_string()))
+            .insert_header(("X-Role", "User"))
             .set_json(&new_debit)
             .to_request();
 
@@ -358,7 +431,7 @@ mod tests {
 
         mock_service
             .expect_get_client_balance()
-            .return_once(move |_p1| Box::pin(future::ready(Ok(client))));
+            .return_once(move |_p1, _p2| Box::pin(future::ready(Ok(client))));
 
         let route_pattern = format!("{}{}{{id}}", MAIN_PATH, MOCK_CLIENT_BALANCE_PATH);
 
@@ -371,7 +444,12 @@ mod tests {
 
         let path = format!("{}{}{}", MAIN_PATH, MOCK_CLIENT_BALANCE_PATH, CLIENT_ID);
 
-        let req = test::TestRequest::get().uri(&path).to_request();
+        let req = test::TestRequest::get()
+            .uri(&path)
+            .insert_header(("X-User-Id", MOCK_USER_ID.to_string()))
+            .insert_header(("X-Client-Id", MOCK_CLIENT_ID.to_string()))
+            .insert_header(("X-Role", "User"))
+            .to_request();
 
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
@@ -388,7 +466,7 @@ mod tests {
 
         mock_service
             .expect_get_client_balance()
-            .return_once(move |_p1| Box::pin(future::ready(Err(CommonError::NotFound))));
+            .return_once(move |_p1, _p2| Box::pin(future::ready(Err(CommonError::NotFound))));
 
         let route_pattern = format!("{}{}{{id}}", MAIN_PATH, MOCK_CLIENT_BALANCE_PATH);
 
@@ -401,7 +479,12 @@ mod tests {
 
         let path = format!("{}{}{}", MAIN_PATH, MOCK_CLIENT_BALANCE_PATH, CLIENT_ID);
 
-        let req = test::TestRequest::get().uri(&path).to_request();
+        let req = test::TestRequest::get()
+            .uri(&path)
+            .insert_header(("X-User-Id", MOCK_USER_ID.to_string()))
+            .insert_header(("X-Client-Id", MOCK_CLIENT_ID.to_string()))
+            .insert_header(("X-Role", "User"))
+            .to_request();
 
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
@@ -416,7 +499,7 @@ mod tests {
 
         mock_service
             .expect_generate_file_with_all_clients_balances()
-            .return_once(move || Box::pin(future::ready(Ok(()))));
+            .return_once(move |_p1| Box::pin(future::ready(Ok(()))));
 
         let path = format!("{}{}", MAIN_PATH, STORE_BALANCE_PATH);
 
@@ -427,7 +510,12 @@ mod tests {
         )
         .await;
 
-        let req = test::TestRequest::post().uri(&path).to_request();
+        let req = test::TestRequest::post()
+            .uri(&path)
+            .insert_header(("X-User-Id", MOCK_USER_ID.to_string()))
+            .insert_header(("X-Client-Id", MOCK_CLIENT_ID.to_string()))
+            .insert_header(("X-Role", "SuperAdmin"))
+            .to_request();
 
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::OK);
@@ -441,7 +529,9 @@ mod tests {
 
         mock_service
             .expect_generate_file_with_all_clients_balances()
-            .return_once(move || Box::pin(future::ready(Err(CommonError::FolderCreationFailed))));
+            .return_once(move |_p1| {
+                Box::pin(future::ready(Err(CommonError::FolderCreationFailed)))
+            });
 
         let path = format!("{}{}", MAIN_PATH, STORE_BALANCE_PATH);
 
@@ -452,7 +542,12 @@ mod tests {
         )
         .await;
 
-        let req = test::TestRequest::post().uri(&path).to_request();
+        let req = test::TestRequest::post()
+            .uri(&path)
+            .insert_header(("X-User-Id", MOCK_USER_ID.to_string()))
+            .insert_header(("X-Client-Id", MOCK_CLIENT_ID.to_string()))
+            .insert_header(("X-Role", "SuperAdmin"))
+            .to_request();
 
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
